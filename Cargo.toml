@@ -9,10 +9,11 @@ path = "src/bin/cli.rs"
 
 [dependencies]
 lofty = "0.22.4"
-yt-dlp = { path = "./yt-dlp" } # fixes issue with srt format, fix by @sshcrack: https://github.com/boul2gom/yt-dlp/pull/55
 spotify-rs = "0.4.1"
 tokio = { version = "1.47.1", features = ["full"] }
-yt-search = "0.1.1"
+rustypipe = "0.11.4"
 reqwest = "0.12.22"
 regex = "1.11.1"
 clap = { version = "4.0", features = ["derive"] }
+rustypipe-downloader = {version = "0.3.1", features = ["audiotag", "indicatif"]}
+indicatif = "0.17.11"

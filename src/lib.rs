@@ -11,7 +11,7 @@ pub mod metadata;
 pub mod spotify;
 pub mod youtube;
 
-fn extract_id_from_url(url: &str) -> Option<String> {
+pub(crate) fn extract_id_from_url(url: &str) -> Option<String> {
     
     let re = Regex::new(r"(track|album|playlist|artist)/([a-zA-Z0-9]+)").unwrap();
     

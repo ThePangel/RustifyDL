@@ -1,85 +1,70 @@
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use rustypipe::client::RustyPipe;
+use rustypipe::param::StreamFilter;
+use rustypipe_downloader::DownloaderBuilder;
 use std::fs;
-use std::path::PathBuf;
-use yt_dlp::Youtube;
-use yt_dlp::fetcher::deps::Libraries;
-use yt_dlp::fetcher::deps::LibraryInstaller;
-use yt_search::{Duration, SearchFilters, SortBy, YouTubeSearch};
+use std::process::Command;
 
-pub(crate) async fn search_yt(name: &str) -> Result<(), Box<dyn std::error::Error>>{
-    let search = match YouTubeSearch::new(None, false) {
-        Ok(search) => search, 
-        Err(e) => {
-            eprintln!("Failed to initialize YouTubeSearch: {}", e);
-            return Err(e);
-        }
-    };
-    let filters = SearchFilters {
-        sort_by: Some(SortBy::ViewCount),
-        duration: Some(Duration::Long),
-    };
+pub(crate) async fn search_yt(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let rp = RustyPipe::new();
+    let search_results = rp.query().music_search_tracks(name).await?;
 
-    match search.search(name, filters).await {
-        Ok(results) => {
-            download(results[0].video_id.as_str()).await.unwrap();
-            Ok(())
-        }
-        Err(e) => {
-            eprintln!("Search error: {}", e);
-            Err(Box::new(e))
-        },
-    }
+    download(search_results.items.items[0].id.as_str(), name).await?;
+    Ok(())
 }
 
-async fn download(id: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let libraries_dir = if cfg!(target_os = "windows") {
-        let program_data = std::env::var("PROGRAMDATA")?;
-        PathBuf::from(program_data).join("RustifyDL").join("libs")
-    } else if cfg!(target_os = "linux") {
-        PathBuf::from("/usr/local/share/RustifyDL/libs")
-    } else {
-        PathBuf::from("libs")
-    };
+async fn download(id: &str, name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let multi = MultiProgress::new();
+    let style = ProgressStyle::default_bar()
+        .template("[{elapsed_precise}] {bar:40.cyan/blue} {percent}% {bytes}/{total_bytes} {msg}")?
+        .progress_chars("█▉▊▋▌▍▎▏ ");
 
-    let output_dir = if cfg!(target_os = "windows") {
-        let program_data = std::env::var("PROGRAMDATA")?;
-        PathBuf::from(program_data)
-            .join("RustifyDL")
-            .join("output/songs")
-    } else if cfg!(target_os = "linux") {
-        PathBuf::from("/usr/local/share/RustifyDL/output/songs")
-    } else {
-        PathBuf::from("output/songs")
-    };
+    let dl = DownloaderBuilder::new()
+        .multi_progress(multi.clone())
+        .progress_style(style.clone())
+        .build();
 
-    fs::create_dir_all(&libraries_dir)?;
-    fs::create_dir_all(&output_dir)?;
+    let pb = multi.add(ProgressBar::new(0));
+    let filter_audio = StreamFilter::new().no_video();
 
-    let mut youtube = libraries_dir.join("yt-dlp");
-    let mut ffmpeg = libraries_dir.join("ffmpeg");
-
-    if !youtube.exists() {
-        println!("yt-dlp not found. Installing...");
-        let installer = LibraryInstaller::new(libraries_dir.clone());
-        youtube = installer.install_youtube(None).await.unwrap();
-    }
-
-    if !ffmpeg.exists() {
-        println!("ffmpeg not found. Installing...");
-        let installer = LibraryInstaller::new(libraries_dir.clone());
-        ffmpeg = installer.install_ffmpeg(None).await.unwrap();
-    }
-
-    let libraries = Libraries::new(youtube, ffmpeg);
-    let fetcher = Youtube::new(libraries, output_dir)?;
-
-    fetcher.update_downloader().await?;
-    let url = String::from(id);
-    let video = fetcher.fetch_video_infos(url).await?;
-
-    let audio_format = video.worst_audio_format().unwrap();
-    fetcher
-        .download_format(&audio_format, format!("{}.mp3", video.title))
+    dl.id(id)
+        .stream_filter(filter_audio)
+        .to_file(format!("./output/{}.opus", name))
+        .progress_bar(pb.clone())
+        .download()
         .await?;
+
+    convert_to_mp3(
+        format!("./output/{}.opus", name).as_str(),
+        format!("./output/{}.mp3", name).as_str(),
+    )?;
+    Ok(())
+}
+
+fn convert_to_mp3(input_file: &str, output_file: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let output = Command::new("ffmpeg")
+        .args([
+            "-i",
+            input_file,
+            "-c:a",
+            "mp3",
+            "-b:a",
+            "320k",
+            "-y",
+            output_file,
+        ])
+        .output()?;
+
+    if !output.status.success() {
+        return Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!(
+                "FFmpeg conversion failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ),
+        )));
+    }
+    fs::remove_file(input_file)?;
 
     Ok(())
 }

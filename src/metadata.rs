@@ -1,38 +1,38 @@
 use lofty::{
     config::WriteOptions,
-    file::TaggedFileExt,
+    file::{AudioFile, TaggedFileExt},
     picture::{MimeType, Picture, PictureType},
     read_from_path,
-    tag::{Accessor, Tag, TagExt},
+    tag::{Accessor, Tag},
 };
 use reqwest;
 use spotify_rs::{ClientCredsClient, model::track::Track};
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap};
 
+fn detect_image_mime_type(bytes: &[u8]) -> MimeType {
+    if bytes.len() < 4 {
+        return MimeType::Jpeg;
+    }
+    
+    if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        return MimeType::Jpeg;
+    }
+    
+    if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+        return MimeType::Png;
+    }
+    
+    MimeType::Jpeg
+}
 pub(crate) async fn metadata(
     songs: HashMap<String, Track>,
     client_id: &str,
     client_secret: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let spotify = ClientCredsClient::authenticate(client_id, client_secret).await?;
-    let output_dir = if cfg!(target_os = "windows") {
-        let program_data = std::env::var("PROGRAMDATA")?;
-        PathBuf::from(program_data)
-            .join("RustifyDL")
-            .join("output/songs")
-    } else if cfg!(target_os = "linux") {
-        PathBuf::from("/usr/local/share/RustifyDL/output/songs")
-    } else {
-        PathBuf::from("output/songs")
-    };
-
-    // Ensure the output directory exists
-    if !output_dir.exists() {
-        std::fs::create_dir_all(&output_dir)?;
-    }
-
+    
     for (key, value) in &songs {
-        let path = format!("{}/{}.mp3", output_dir.to_string_lossy(), key);
+        let path = format!("./output/{}.mp3", key);
         let mut tagged_file = read_from_path(&path)?;
 
         let tag = match tagged_file.primary_tag_mut() {
@@ -76,14 +76,19 @@ pub(crate) async fn metadata(
 
         let image_url = &album.images[0].url;
         let image_bytes = reqwest::get(image_url).await?.bytes().await?.to_vec();
+        
+        let mime_type = detect_image_mime_type(&image_bytes);
+        println!("Detected MIME type: {:?}", mime_type);
+        
 
+        
         let front_cover = Picture::new_unchecked(
             PictureType::CoverFront,
-            Some(MimeType::Png),
-            None,
+            Some(mime_type),
+            Some("Cover".to_string()),
             image_bytes,
         );
-        tag.push_picture(front_cover);
+        tag.push_picture(front_cover); 
         tag.set_track(value.track_number);
         tag.set_track_total(album.total_tracks);
 
@@ -93,7 +98,12 @@ pub(crate) async fn metadata(
             }
         }
 
-        tag.save_to_path(path.clone(), WriteOptions::default())
+        let write_options = WriteOptions::new()
+            .use_id3v23(true)
+            .remove_others(false)
+            .respect_read_only(false);
+        
+        tagged_file.save_to_path(path.clone(), write_options)
             .expect("ERROR: Failed to write the tag!");
     }
     Ok(())
