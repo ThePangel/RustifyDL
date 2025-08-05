@@ -46,7 +46,7 @@ pub(crate) async fn fetch_playlist(
                             .join(", ")
                     ));
                 }
-                PlayableItem::Episode(episode) => {}
+                PlayableItem::Episode(_episode) => {}
             }
         } else {
             println!("No song found.");
