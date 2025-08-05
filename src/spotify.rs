@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use spotify_rs::model::track::{Track};
 
 pub(crate) async fn fetch_track(
-    id: String,
-    client_id: String,
-    client_secret: String,
+    id: &str,
+    client_id: &str,
+    client_secret: &str,
 ) -> Result<HashMap<String, Track>, Box<dyn std::error::Error>> {
     let spotify = ClientCredsClient::authenticate(client_id, client_secret).await?;
 
-    let track = spotify_rs::track(&id).get(&spotify).await?;
+    let track = spotify_rs::track(id).get(&spotify).await?;
     let mut songs = HashMap::<String, Track>::new();
     songs.insert(
         format!(

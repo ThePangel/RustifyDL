@@ -14,3 +14,5 @@ spotify-rs = "0.4.1"
 tokio = { version = "1.47.1", features = ["full"] }
 yt-search = "0.1.1"
 reqwest = "0.12.22"
+regex = "1.11.1"
+clap = { version = "4.0", features = ["derive"] }

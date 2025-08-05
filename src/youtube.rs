@@ -5,12 +5,12 @@ use yt_dlp::fetcher::deps::Libraries;
 use yt_dlp::fetcher::deps::LibraryInstaller;
 use yt_search::{Duration, SearchFilters, SortBy, YouTubeSearch};
 
-pub(crate) async fn search(name: &str) {
+pub(crate) async fn search_yt(name: &str) -> Result<(), Box<dyn std::error::Error>>{
     let search = match YouTubeSearch::new(None, false) {
-        Ok(search) => search,
+        Ok(search) => search, 
         Err(e) => {
             eprintln!("Failed to initialize YouTubeSearch: {}", e);
-            return;
+            return Err(e);
         }
     };
     let filters = SearchFilters {
@@ -21,8 +21,12 @@ pub(crate) async fn search(name: &str) {
     match search.search(name, filters).await {
         Ok(results) => {
             download(results[0].video_id.as_str()).await.unwrap();
+            Ok(())
         }
-        Err(e) => eprintln!("Search error: {}", e),
+        Err(e) => {
+            eprintln!("Search error: {}", e);
+            Err(Box::new(e))
+        },
     }
 }
 

@@ -11,8 +11,8 @@ use std::{collections::HashMap, path::PathBuf};
 
 pub(crate) async fn metadata(
     songs: HashMap<String, Track>,
-    client_id: String,
-    client_secret: String,
+    client_id: &str,
+    client_secret: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let spotify = ClientCredsClient::authenticate(client_id, client_secret).await?;
     let output_dir = if cfg!(target_os = "windows") {
@@ -81,13 +81,12 @@ pub(crate) async fn metadata(
         tag.set_track(value.track_number);
         tag.set_track_total(album.total_tracks);
 
-        
         if album.release_date.len() >= 4 {
             if let Ok(year) = album.release_date[..4].parse::<u32>() {
                 tag.set_year(year);
             }
         }
-        
+
         tag.save_to_path(path.clone(), WriteOptions::default())
             .expect("ERROR: Failed to write the tag!");
     }
