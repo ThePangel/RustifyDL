@@ -1835,6 +1835,7 @@ name = "rustify"
 version = "0.1.0"
 dependencies = [
  "lofty",
+ "reqwest 0.12.22",
  "spotify-rs",
  "tokio",
  "yt-dlp",

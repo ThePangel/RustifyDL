@@ -13,3 +13,4 @@ yt-dlp = { path = "./yt-dlp" } # fixes issue with srt format, fix by @sshcrack: 
 spotify-rs = "0.4.1"
 tokio = { version = "1.47.1", features = ["full"] }
 yt-search = "0.1.1"
+reqwest = "0.12.22"
