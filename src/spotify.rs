@@ -7,10 +7,12 @@ pub(crate) async fn fetch_track(
     client_id: &str,
     client_secret: &str,
 ) -> Result<HashMap<String, Track>, Box<dyn std::error::Error>> {
+    print!("test2");
     let spotify = ClientCredsClient::authenticate(client_id, client_secret).await?;
 
     let track = spotify_rs::track(id).get(&spotify).await?;
     let mut songs = HashMap::<String, Track>::new();
+    println!("{:?}", track);
     songs.insert(
         format!(
             "{} - {}",
@@ -75,6 +77,7 @@ pub(crate) async fn fetch_album(
     
     let album = spotify_rs::album(id).get(&spotify).await?;
     let tracks = album.tracks.get_all(&spotify).await?;
+    
     for song in tracks {
         if let Some(song) = song {
             let track = spotify_rs::track(&song.href).get(&spotify).await?;

@@ -25,6 +25,12 @@ pub(crate) async fn metadata(
     } else {
         PathBuf::from("output/songs")
     };
+
+    // Ensure the output directory exists
+    if !output_dir.exists() {
+        std::fs::create_dir_all(&output_dir)?;
+    }
+
     for (key, value) in &songs {
         let path = format!("{}/{}.mp3", output_dir.to_string_lossy(), key);
         let mut tagged_file = read_from_path(&path)?;
