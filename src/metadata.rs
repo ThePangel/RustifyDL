@@ -72,7 +72,7 @@ pub(crate) async fn metadata(
             .join(", "),
     );
     tag.set_disk(track.disc_number);
-
+    
     let image_url = &album.images[0].url;
     let image_bytes = reqwest::get(image_url).await?.bytes().await?.to_vec();
 

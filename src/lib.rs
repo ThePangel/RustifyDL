@@ -13,6 +13,11 @@ pub mod metadata;
 pub mod spotify;
 pub mod youtube;
 
+fn sanitize_filename(name: &str) -> String {
+    let re = Regex::new(r#"[<>:"/\\|?*\x00-\x1F]"#).unwrap();
+    re.replace_all(name.trim(), "").to_string()
+}
+
 pub(crate) fn extract_id_from_url(url: &str) -> Option<String> {
     let re = Regex::new(r"(track|album|playlist|artist)/([a-zA-Z0-9]+)").unwrap();
 
@@ -101,7 +106,7 @@ async fn download_and_tag_tracks(
     for (name, track) in &tracks {
         let semaphore = semaphore.clone();
         
-        let name = name.clone();
+        let name = sanitize_filename(&name.as_str());
         let track = track.clone();
         let client_id = client_id.to_string();
         let client_secret = client_secret.to_string();
