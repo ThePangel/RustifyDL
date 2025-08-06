@@ -6,7 +6,10 @@ use lofty::{
     tag::{Accessor, Tag},
 };
 use reqwest;
-use spotify_rs::{ClientCredsClient, model::track::Track};
+use spotify_rs::{
+    ClientCredsClient,
+    model::{track::Track},
+};
 
 fn detect_image_mime_type(bytes: &[u8]) -> MimeType {
     if bytes.len() < 4 {
@@ -63,16 +66,30 @@ pub(crate) async fn metadata(
     let album = spotify_rs::album(track.album.id.clone())
         .get(&spotify)
         .await?;
-    tag.set_genre(
-        album
-            .genres
-            .iter()
-            .map(|genre| genre.as_str())
-            .collect::<Vec<_>>()
-            .join(", "),
-    );
+ 
+    if !album.genres.is_empty() {
+        tag.set_genre(
+            album
+                .genres
+                .iter()
+                .map(|genre| genre.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+    } else {
+        let song_artist = spotify_rs::get_artist(&album.artists[0].id, &spotify).await?;
+        tag.set_genre(
+            song_artist
+                .genres
+                .iter()
+                .map(|genre| genre.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+    }
+
     tag.set_disk(track.disc_number);
-    
+
     let image_url = &album.images[0].url;
     let image_bytes = reqwest::get(image_url).await?.bytes().await?.to_vec();
 
@@ -87,13 +104,8 @@ pub(crate) async fn metadata(
     tag.push_picture(front_cover);
     tag.set_track(track.track_number);
     tag.set_track_total(album.total_tracks);
-
-    if album.release_date.len() >= 4 {
-        if let Ok(year) = album.release_date[..4].parse::<u32>() {
-            tag.set_year(year);
-        }
-    }
-
+    tag.set_year(album.release_date[..4].parse::<u32>().unwrap_or(0));
+        
     let write_options = WriteOptions::new()
         .use_id3v23(true)
         .remove_others(false)

@@ -6,15 +6,20 @@ use std::process::Command;
 use std::time::Duration;
 use tokio::time::timeout;
 
-pub(crate) async fn search_yt(name: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub enum DownloadResult {
+    Completed,
+    Skipped,
+}
+
+pub(crate) async fn search_yt(name: &str) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
     let rp = RustyPipe::new();
     let search_results = rp.query().music_search_tracks(name).await?;
 
     download(search_results.items.items[0].id.as_str(), name).await?;
-    Ok(())
+    Ok(DownloadResult::Completed)
 }
 
-async fn download(id: &str, name: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn download(id: &str, name: &str) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
     fs::create_dir_all("./output")?;
 
     let dl = DownloaderBuilder::new().build();
@@ -23,7 +28,7 @@ async fn download(id: &str, name: &str) -> Result<(), Box<dyn std::error::Error 
     let processed_file = format!("./output/{}.mp3", name);
     if std::path::Path::new(&processed_file).exists() {
         println!("File already exists, skipping: {}", name);
-        return Ok(());
+        return Ok(DownloadResult::Skipped);
     }
     println!("Starting download: {}", name);
     let download_builder = dl.id(id).stream_filter(filter_audio).to_file(&file);
@@ -32,14 +37,12 @@ async fn download(id: &str, name: &str) -> Result<(), Box<dyn std::error::Error 
     match timeout(Duration::from_secs(180), download_status).await {
         Ok(inner_result) => {
             if let Ok(value) = inner_result {
-                file = value
-                    .dest
-                    .to_str()
-                    .map(|s| s.to_string())
-                    .ok_or_else(|| std::io::Error::new(
+                file = value.dest.to_str().map(|s| s.to_string()).ok_or_else(|| {
+                    std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
                         format!("Failed to convert destination path to string for {}", name),
-                    ))?;
+                    )
+                })?;
             } else if let Err(e) = inner_result {
                 return Err(format!("Download library error for {}: {}", name, e).into());
             }
@@ -54,22 +57,25 @@ async fn download(id: &str, name: &str) -> Result<(), Box<dyn std::error::Error 
             )));
         }
     }
-    if std::path::Path::new(&file).exists(){
+    if std::path::Path::new(&file).exists() {
         convert_to_mp3(&file.as_str(), &processed_file.as_str(), name)?;
     } else {
         return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidFilename,
-                format!("Download for {} failed or didn't start: File not Found", name),
-            )));
+            std::io::ErrorKind::InvalidFilename,
+            format!(
+                "Download for {} failed or didn't start: File not Found",
+                name
+            ),
+        )));
     }
 
-    Ok(())
+    Ok(DownloadResult::Completed)
 }
 
 fn convert_to_mp3(
     input_file: &str,
     output_file: &str,
-    name: &str
+    name: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let output = Command::new("ffmpeg")
         .args([

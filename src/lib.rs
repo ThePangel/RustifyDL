@@ -1,12 +1,12 @@
 use {
     crate::metadata::metadata,
     crate::spotify::{fetch_album, fetch_playlist, fetch_track},
-    crate::youtube::search_yt,
+    crate::youtube::{DownloadResult, search_yt},
     regex::Regex,
     spotify_rs::model::track::Track,
     std::collections::HashMap,
-    tokio::sync::Semaphore,
     std::sync::Arc,
+    tokio::sync::Semaphore,
 };
 
 pub mod metadata;
@@ -105,7 +105,7 @@ async fn download_and_tag_tracks(
 
     for (name, track) in &tracks {
         let semaphore = semaphore.clone();
-        
+
         let name = sanitize_filename(&name.as_str());
         let track = track.clone();
         let client_id = client_id.to_string();
@@ -113,8 +113,9 @@ async fn download_and_tag_tracks(
         let handle = tokio::spawn(async move {
             let _permit = semaphore.acquire().await.unwrap();
 
-            search_yt(&name).await?;
-            metadata(&name, &track, &client_id, &client_secret).await?;
+            if let DownloadResult::Completed = search_yt(&name).await? {
+                metadata(&name, &track, &client_id, &client_secret).await?;
+            }
 
             Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
         });
@@ -131,4 +132,3 @@ async fn download_and_tag_tracks(
     println!("Finished!");
     Ok(())
 }
-
