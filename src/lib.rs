@@ -5,6 +5,8 @@ use {
     regex::Regex,
     spotify_rs::model::track::Track,
     std::collections::HashMap,
+    tokio::sync::Semaphore,
+    std::sync::Arc,
 };
 
 pub mod metadata;
@@ -94,24 +96,34 @@ async fn download_and_tag_tracks(
     client_secret: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut handles = Vec::new();
+    let semaphore = Arc::new(Semaphore::new(15));
 
     for (name, track) in &tracks {
+        let semaphore = semaphore.clone();
+        
         let name = name.clone();
         let track = track.clone();
         let client_id = client_id.to_string();
         let client_secret = client_secret.to_string();
         let handle = tokio::spawn(async move {
-            search_yt(&name).await.unwrap();
-            metadata(&name, &track, &client_id, &client_secret).await.unwrap();
-            
+            let _permit = semaphore.acquire().await.unwrap();
+
+            search_yt(&name).await?;
+            metadata(&name, &track, &client_id, &client_secret).await?;
+
+            Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
         });
         handles.push(handle);
     }
 
-    println!("Downloading {} tracks...", handles.len());
     for handle in handles {
-        handle.await?;
+        match handle.await {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => eprintln!("Task failed: {}", e),
+            Err(e) => eprintln!("Join error: {}", e),
+        }
     }
     println!("Finished!");
     Ok(())
 }
+
