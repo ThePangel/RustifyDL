@@ -3,8 +3,8 @@ use {
     crate::spotify::{fetch_album, fetch_playlist, fetch_track},
     crate::youtube::search_yt,
     regex::Regex,
-    std::collections::HashMap,
     spotify_rs::model::track::Track,
+    std::collections::HashMap,
 };
 
 pub mod metadata;
@@ -12,9 +12,8 @@ pub mod spotify;
 pub mod youtube;
 
 pub(crate) fn extract_id_from_url(url: &str) -> Option<String> {
-    
     let re = Regex::new(r"(track|album|playlist|artist)/([a-zA-Z0-9]+)").unwrap();
-    
+
     if let Some(captures) = re.captures(url) {
         return captures.get(2).map(|id| id.as_str().to_string());
     }
@@ -59,7 +58,7 @@ pub async fn download_spotify(
     url: &str,
     client_id: &str,
     client_secret: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (url_type, id) = is_valid_spotify_url(url).ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid Spotify URL")
     })?;
@@ -92,11 +91,27 @@ pub async fn download_spotify(
 async fn download_and_tag_tracks(
     tracks: HashMap<String, Track>,
     client_id: &str,
-    client_secret: &str
-) -> Result<(), Box<dyn std::error::Error>> {
-    for (name, _track) in &tracks {
-        search_yt(name.as_str()).await?;
+    client_secret: &str,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let mut handles = Vec::new();
+
+    for (name, track) in &tracks {
+        let name = name.clone();
+        let track = track.clone();
+        let client_id = client_id.to_string();
+        let client_secret = client_secret.to_string();
+        let handle = tokio::spawn(async move {
+            search_yt(&name).await.unwrap();
+            metadata(&name, &track, &client_id, &client_secret).await.unwrap();
+            
+        });
+        handles.push(handle);
     }
-    metadata(tracks, client_id, client_secret).await?;
+
+    println!("Downloading {} tracks...", handles.len());
+    for handle in handles {
+        handle.await?;
+    }
+    println!("Finished!");
     Ok(())
 }

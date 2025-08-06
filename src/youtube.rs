@@ -1,11 +1,10 @@
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rustypipe::client::RustyPipe;
 use rustypipe::param::StreamFilter;
 use rustypipe_downloader::DownloaderBuilder;
 use std::fs;
 use std::process::Command;
 
-pub(crate) async fn search_yt(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub(crate) async fn search_yt(name: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let rp = RustyPipe::new();
     let search_results = rp.query().music_search_tracks(name).await?;
 
@@ -13,24 +12,15 @@ pub(crate) async fn search_yt(name: &str) -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-async fn download(id: &str, name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let multi = MultiProgress::new();
-    let style = ProgressStyle::default_bar()
-        .template("[{elapsed_precise}] {bar:40.cyan/blue} {percent}% {bytes}/{total_bytes} {msg}")?
-        .progress_chars("█▉▊▋▌▍▎▏ ");
-
-    let dl = DownloaderBuilder::new()
-        .multi_progress(multi.clone())
-        .progress_style(style.clone())
-        .build();
-
-    let pb = multi.add(ProgressBar::new(0));
+async fn download(id: &str, name: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    println!("Starting download: {}", name);
+    
+    let dl = DownloaderBuilder::new().build();
     let filter_audio = StreamFilter::new().no_video();
 
     dl.id(id)
         .stream_filter(filter_audio)
         .to_file(format!("./output/{}.opus", name))
-        .progress_bar(pb.clone())
         .download()
         .await?;
 
@@ -38,18 +28,20 @@ async fn download(id: &str, name: &str) -> Result<(), Box<dyn std::error::Error>
         format!("./output/{}.opus", name).as_str(),
         format!("./output/{}.mp3", name).as_str(),
     )?;
+    
+    println!("Completed: {}", name);
     Ok(())
 }
 
-fn convert_to_mp3(input_file: &str, output_file: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn convert_to_mp3(input_file: &str, output_file: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let output = Command::new("ffmpeg")
         .args([
-            "-i",
-            input_file,
-            "-c:a",
-            "mp3",
-            "-b:a",
-            "320k",
+               "-i", input_file,
+            "-c:a", "libmp3lame",
+            "-preset", "ultrafast",     
+            "-b:a", "96k",             
+            "-q:a", "9",                
+            "-threads", "0",           
             "-y",
             output_file,
         ])

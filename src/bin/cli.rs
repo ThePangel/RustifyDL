@@ -9,7 +9,7 @@ pub struct Cli {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let args = Cli::parse();
     download_spotify(&args.url, &args.client_id, &args.client_secret).await?;
     Ok(())
