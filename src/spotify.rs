@@ -51,7 +51,7 @@ pub(crate) async fn fetch_playlist(
                             track.name,
                         )
                         .as_str(),
-                    ) {
+                    ) && !options.no_dupes {
                         songs.insert(
                             format!(
                                 "{} - {} - {}",

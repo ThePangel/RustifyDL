@@ -24,13 +24,13 @@ pub struct Cli {
     pub client_secret: Option<String>,
 
     #[arg(long = "output-dir", short, default_value = "./output")]
-    pub output_dir: Option<String>,
+    pub output_dir: String, 
+    
+    #[arg(long = "concurrent-downloads", short, default_value_t = 15)]
+    pub concurrent_downloads: usize,
 
-    #[arg(long = "concurrent-downloads", short, default_value = "15")]
-    pub concurrent_downloads: Option<usize>,
-
-    #[arg(long = "no-dupes", default_value = "false")]
-    pub no_dupes: Option<bool>,
+    #[arg(long = "no-dupes", action = clap::ArgAction::SetTrue)]
+    pub no_dupes: bool, 
 }
 
 #[tokio::main]
@@ -43,28 +43,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let config = check_api_keys().await?;
             (config.client_id, config.client_secret)
         };
-    let output_dir = if let Some(dir) = args.output_dir {
-        dir
-    } else {
-        "./output".to_string()
-    };
-    let concurrent_downloads = if let Some(cd) = args.concurrent_downloads {
-        cd
-    } else {
-        15_usize
-    };
-    let no_dupes = if let Some(dupes) = args.no_dupes {
-        dupes
-    } else {
-        false
-    };
+
     let options = DownloadOptions {
         url: args.url,
-        client_id: client_id,
-        client_secret: client_secret,
-        output_dir: output_dir,
-        concurrent_downloads: concurrent_downloads,
-        no_dupes,
+        client_id,
+        client_secret,
+        output_dir: args.output_dir,
+        concurrent_downloads: args.concurrent_downloads,
+        no_dupes: args.no_dupes,
     };
     download_spotify(options).await?;
     Ok(())
