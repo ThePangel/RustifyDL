@@ -13,13 +13,13 @@ pub(crate) async fn fetch_track(
     songs.insert(
         format!(
             "{} - {}",
-            track.name,
             track
                 .artists
                 .iter()
                 .map(|artist| artist.name.as_str())
                 .collect::<Vec<_>>()
-                .join(", ")
+                .join(", "),
+            track.name,
         ),
         track,
     );
@@ -40,19 +40,48 @@ pub(crate) async fn fetch_playlist(
         if let Some(song) = song {
             match song.track {
                 PlayableItem::Track(track) => {
-                    songs.insert(
+                    if songs.contains_key(
                         format!(
                             "{} - {}",
-                            track.name,
                             track
                                 .artists
                                 .iter()
                                 .map(|artist| artist.name.as_str())
                                 .collect::<Vec<_>>()
-                                .join(", ")
-                        ),
-                        track,
-                    );
+                                .join(", "),
+                            track.name,
+                        )
+                        .as_str(),
+                    ) {
+                        songs.insert(
+                            format!(
+                                "{} - {} - {}",
+                                track
+                                    .artists
+                                    .iter()
+                                    .map(|artist| artist.name.as_str())
+                                    .collect::<Vec<_>>()
+                                    .join(", "),
+                                track.album.name,
+                                track.name,
+                            ),
+                            track,
+                        );
+                    } else {
+                        songs.insert(
+                            format!(
+                                "{} - {}",
+                                track
+                                    .artists
+                                    .iter()
+                                    .map(|artist| artist.name.as_str())
+                                    .collect::<Vec<_>>()
+                                    .join(", "),
+                                track.name,
+                            ),
+                            track,
+                        );
+                    }
                 }
                 PlayableItem::Episode(_episode) => {}
             }
@@ -60,6 +89,7 @@ pub(crate) async fn fetch_playlist(
             println!("No song found.");
         }
     }
+    println!("Found {} tracks in {}!", songs.len(), playlist.name);
     Ok(songs)
 }
 
@@ -80,13 +110,13 @@ pub(crate) async fn fetch_album(
             songs.insert(
                 format!(
                     "{} - {}",
-                    track.name,
                     track
                         .artists
                         .iter()
                         .map(|artist| artist.name.as_str())
                         .collect::<Vec<_>>()
-                        .join(", ")
+                        .join(", "),
+                    track.name,
                 ),
                 track,
             );
@@ -94,6 +124,6 @@ pub(crate) async fn fetch_album(
             println!("No song found.");
         }
     }
-
+    println!("Found {} tracks!", songs.len());
     Ok(songs)
 }

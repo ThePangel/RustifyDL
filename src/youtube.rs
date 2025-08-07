@@ -30,7 +30,7 @@ async fn download(id: &str, name: &str) -> Result<DownloadResult, Box<dyn std::e
         println!("File already exists, skipping: {}", name);
         return Ok(DownloadResult::Skipped);
     }
-    println!("Starting download: {}", name);
+   
     let download_builder = dl.id(id).stream_filter(filter_audio).to_file(&file);
     let download_status = download_builder.download();
 

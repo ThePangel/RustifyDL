@@ -109,20 +109,20 @@ async fn download_and_tag_tracks(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut handles = Vec::new();
     let semaphore = Arc::new(Semaphore::new(15));
-
-    for (name, track) in &tracks {
+    let lenght = tracks.clone().len();
+    for (i, (name, track)) in tracks.iter().enumerate() {
         let semaphore = semaphore.clone();
-
+        
         let name = sanitize_filename(&name.as_str());
         let track = track.clone();
         let client_id = client_id.to_string();
         let client_secret = client_secret.to_string();
         let handle = tokio::spawn(async move {
-            let _permit = semaphore.acquire().await.unwrap();
-
-            if let DownloadResult::Completed = search_yt(&name).await? {
-                metadata(&name, &track, &client_id, &client_secret).await?;
-            }
+        let _permit = semaphore.acquire().await.unwrap();
+        println!("{}/{} Starting download: {}", i, lenght, name);
+        if let DownloadResult::Completed = search_yt(&name).await? {
+             metadata(&name, &track, &client_id, &client_secret).await?;
+        }
 
             Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
         });
