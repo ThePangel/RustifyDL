@@ -11,6 +11,7 @@ use spotify_rs::{
     model::{track::Track},
 };
 
+
 fn detect_image_mime_type(bytes: &[u8]) -> MimeType {
     if bytes.len() < 4 {
         return MimeType::Jpeg;

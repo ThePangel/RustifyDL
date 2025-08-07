@@ -13,6 +13,15 @@ pub mod metadata;
 pub mod spotify;
 pub mod youtube;
 
+pub struct DownloadOptions {
+    pub url: String,
+    pub client_id: String,
+    pub client_secret: String,
+    pub output_dir: String,
+    pub concurrent_downloads: u8,
+}
+
+
 fn sanitize_filename(name: &str) -> String {
     let re = Regex::new(r#"[<>:"/\\|?*\x00-\x1F]"#).unwrap();
     re.replace_all(name.trim(), "").to_string()
@@ -62,28 +71,26 @@ fn is_valid_spotify_url(url: &str) -> Option<(SpotifyUrlType, String)> {
 }
 
 pub async fn download_spotify(
-    url: &str,
-    client_id: &str,
-    client_secret: &str,
+    options: DownloadOptions,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let (url_type, id) = is_valid_spotify_url(url).ok_or_else(|| {
+    let (url_type, id) = is_valid_spotify_url(&options.url).ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid Spotify URL")
     })?;
 
     match url_type {
         SpotifyUrlType::Track => {
-            let tracks = fetch_track(&id, client_id, client_secret).await?;
-            download_and_tag_tracks(tracks, client_id, client_secret).await?;
+            let tracks = fetch_track(&id, &options.client_id, &options.client_secret).await?;
+            download_and_tag_tracks(tracks, &options.client_id, &options.client_secret).await?;
             return Ok(());
         }
         SpotifyUrlType::Album => {
-            let tracks = fetch_album(&id, client_id, client_secret).await?;
-            download_and_tag_tracks(tracks, client_id, client_secret).await?;
+            let tracks = fetch_album(&id, &options.client_id, &options.client_secret).await?;
+            download_and_tag_tracks(tracks, &options.client_id, &options.client_secret).await?;
             return Ok(());
         }
         SpotifyUrlType::Playlist => {
-            let tracks = fetch_playlist(&id, client_id, client_secret).await?;
-            download_and_tag_tracks(tracks, client_id, client_secret).await?;
+            let tracks = fetch_playlist(&id, &options.client_id, &options.client_secret).await?;
+            download_and_tag_tracks(tracks, &options.client_id, &options.client_secret).await?;
             return Ok(());
         }
         SpotifyUrlType::Artist => {
