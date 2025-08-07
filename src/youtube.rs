@@ -1,32 +1,34 @@
 use rustypipe::client::RustyPipe;
 use rustypipe::param::StreamFilter;
 use rustypipe_downloader::DownloaderBuilder;
-use std::fs;
+use std::path::PathBuf;
+use std::{fs};
 use std::process::Command;
 use std::time::Duration;
 use tokio::time::timeout;
+use crate::DownloadOptions;
 
 pub enum DownloadResult {
     Completed,
     Skipped,
 }
 
-pub(crate) async fn search_yt(name: &str) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
+pub(crate) async fn search_yt(name: &str, options: &DownloadOptions) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
     let rp = RustyPipe::new();
     let search_results = rp.query().music_search_tracks(name).await?;
 
-    download(search_results.items.items[0].id.as_str(), name).await?;
+    download(search_results.items.items[0].id.as_str(), name, options).await?;
     Ok(DownloadResult::Completed)
 }
 
-async fn download(id: &str, name: &str) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
-    fs::create_dir_all("./output")?;
+async fn download(id: &str, name: &str, options: &DownloadOptions) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
+    fs::create_dir_all(options.output_dir.clone())?;
 
     let dl = DownloaderBuilder::new().build();
     let filter_audio = StreamFilter::new().no_video();
-    let mut file = format!("./output/{}", name);
-    let processed_file = format!("./output/{}.mp3", name);
-    if std::path::Path::new(&processed_file).exists() {
+    let mut file = PathBuf::from(format!("{}/temp/{}", options.output_dir, name));
+    let processed_file =PathBuf::from(format!("{}/{}.mp3", options.output_dir, name));
+    if processed_file.exists() {
         println!("File already exists, skipping: {}", name);
         return Ok(DownloadResult::Skipped);
     }
@@ -37,12 +39,7 @@ async fn download(id: &str, name: &str) -> Result<DownloadResult, Box<dyn std::e
     match timeout(Duration::from_secs(180), download_status).await {
         Ok(inner_result) => {
             if let Ok(value) = inner_result {
-                file = value.dest.to_str().map(|s| s.to_string()).ok_or_else(|| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        format!("Failed to convert destination path to string for {}", name),
-                    )
-                })?;
+                file = value.dest;
             } else if let Err(e) = inner_result {
                 return Err(format!("Download library error for {}: {}", name, e).into());
             }
@@ -57,8 +54,8 @@ async fn download(id: &str, name: &str) -> Result<DownloadResult, Box<dyn std::e
             )));
         }
     }
-    if std::path::Path::new(&file).exists() {
-        convert_to_mp3(&file.as_str(), &processed_file.as_str(), name)?;
+    if file.exists() {
+        convert_to_mp3(file.to_str().ok_or("Invalid UTF-8 in file path")?, processed_file.to_str().ok_or("Invalid UTF-8 in file path")?, name)?;
     } else {
         return Err(Box::new(std::io::Error::new(
             std::io::ErrorKind::InvalidFilename,
@@ -105,7 +102,7 @@ fn convert_to_mp3(
             ),
         )));
     }
-    fs::remove_file(input_file)?;
+   
     println!("Completed: {}", name);
     Ok(())
 }

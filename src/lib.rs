@@ -1,11 +1,12 @@
 use {
-    crate::metadata::metadata,
-    crate::spotify::{fetch_album, fetch_playlist, fetch_track},
-    crate::youtube::{DownloadResult, search_yt},
+    crate::{
+        metadata::metadata,
+        spotify::{fetch_album, fetch_playlist, fetch_track},
+        youtube::{DownloadResult, search_yt},
+    },
     regex::Regex,
     spotify_rs::model::track::Track,
-    std::collections::HashMap,
-    std::sync::Arc,
+    std::{collections::HashMap, fs, sync::Arc},
     tokio::sync::Semaphore,
 };
 
@@ -18,9 +19,9 @@ pub struct DownloadOptions {
     pub client_id: String,
     pub client_secret: String,
     pub output_dir: String,
-    pub concurrent_downloads: u8,
+    pub concurrent_downloads: usize,
+    pub no_dupes: bool,
 }
-
 
 fn sanitize_filename(name: &str) -> String {
     let re = Regex::new(r#"[<>:"/\\|?*\x00-\x1F]"#).unwrap();
@@ -77,52 +78,51 @@ pub async fn download_spotify(
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid Spotify URL")
     })?;
 
-    match url_type {
-        SpotifyUrlType::Track => {
-            let tracks = fetch_track(&id, &options.client_id, &options.client_secret).await?;
-            download_and_tag_tracks(tracks, &options.client_id, &options.client_secret).await?;
-            return Ok(());
-        }
-        SpotifyUrlType::Album => {
-            let tracks = fetch_album(&id, &options.client_id, &options.client_secret).await?;
-            download_and_tag_tracks(tracks, &options.client_id, &options.client_secret).await?;
-            return Ok(());
-        }
-        SpotifyUrlType::Playlist => {
-            let tracks = fetch_playlist(&id, &options.client_id, &options.client_secret).await?;
-            download_and_tag_tracks(tracks, &options.client_id, &options.client_secret).await?;
-            return Ok(());
-        }
+    let tracks = match url_type {
+        SpotifyUrlType::Track => fetch_track(&id, &options).await?,
+        SpotifyUrlType::Album => fetch_album(&id, &options).await?,
+        SpotifyUrlType::Playlist => fetch_playlist(&id, &options).await?,
         SpotifyUrlType::Artist => {
             return Err(Box::new(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "Artist URLs are not supported. Please provide a track, album, or playlist URL.",
             )));
         }
-    }
+    };
+
+    download_and_tag_tracks(tracks, &options).await?;
+    Ok(())
 }
 
 async fn download_and_tag_tracks(
     tracks: HashMap<String, Track>,
-    client_id: &str,
-    client_secret: &str,
+    options: &DownloadOptions,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut handles = Vec::new();
-    let semaphore = Arc::new(Semaphore::new(15));
+    let semaphore = Arc::new(Semaphore::new(options.concurrent_downloads));
     let lenght = tracks.clone().len();
     for (i, (name, track)) in tracks.iter().enumerate() {
         let semaphore = semaphore.clone();
-        
         let name = sanitize_filename(&name.as_str());
         let track = track.clone();
-        let client_id = client_id.to_string();
-        let client_secret = client_secret.to_string();
+        let client_id = options.client_id.to_string();
+        let client_secret = options.client_secret.to_string();
+        let output_dir = options.output_dir.to_string();
+        let no_dupes = options.no_dupes;
+        let options_cloned = DownloadOptions {
+            url: options.url.clone(),
+            client_id: client_id.clone(),
+            client_secret: client_secret.clone(),
+            output_dir,
+            concurrent_downloads: options.concurrent_downloads,
+            no_dupes,
+        };
         let handle = tokio::spawn(async move {
-        let _permit = semaphore.acquire().await.unwrap();
-        println!("{}/{} Starting download: {}", i, lenght, name);
-        if let DownloadResult::Completed = search_yt(&name).await? {
-             metadata(&name, &track, &client_id, &client_secret).await?;
-        }
+            let _permit = semaphore.acquire().await.unwrap();
+            println!("{}/{} Starting download: {}", i, lenght, name);
+            if let DownloadResult::Completed = search_yt(&name, &options_cloned).await? {
+                metadata(&name, &track, &options_cloned).await?;
+            }
 
             Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
         });
@@ -136,6 +136,7 @@ async fn download_and_tag_tracks(
             Err(e) => eprintln!("Join error: {}", e),
         }
     }
+    fs::remove_dir_all(format!("{}/temp", options.output_dir))?;
     println!("Finished!");
     Ok(())
 }

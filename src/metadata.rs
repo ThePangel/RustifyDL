@@ -11,6 +11,8 @@ use spotify_rs::{
     model::{track::Track},
 };
 
+use crate::DownloadOptions;
+
 
 fn detect_image_mime_type(bytes: &[u8]) -> MimeType {
     if bytes.len() < 4 {
@@ -30,12 +32,11 @@ fn detect_image_mime_type(bytes: &[u8]) -> MimeType {
 pub(crate) async fn metadata(
     song: &String,
     track: &Track,
-    client_id: &str,
-    client_secret: &str,
+    options: &DownloadOptions,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let spotify = ClientCredsClient::authenticate(client_id, client_secret).await?;
+    let spotify = ClientCredsClient::authenticate(options.client_id.clone(), options.client_secret.clone()).await?;
 
-    let path = format!("./output/{}.mp3", song);
+    let path = format!("{}/{}.mp3", options.output_dir, song);
     let mut tagged_file = read_from_path(&path)?;
 
     let tag = match tagged_file.primary_tag_mut() {

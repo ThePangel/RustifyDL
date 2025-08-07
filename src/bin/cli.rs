@@ -27,7 +27,10 @@ pub struct Cli {
     pub output_dir: Option<String>,
 
     #[arg(long = "concurrent-downloads", short, default_value = "15")]
-    pub concurrent_downloads: Option<u8>,
+    pub concurrent_downloads: Option<usize>,
+
+    #[arg(long = "no-dupes", default_value = "false")]
+    pub no_dupes: Option<bool>,
 }
 
 #[tokio::main]
@@ -48,7 +51,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let concurrent_downloads = if let Some(cd) = args.concurrent_downloads {
         cd
     } else {
-        15_u8
+        15_usize
+    };
+    let no_dupes = if let Some(dupes) = args.no_dupes {
+        dupes
+    } else {
+        false
     };
     let options = DownloadOptions {
         url: args.url,
@@ -56,6 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         client_secret: client_secret,
         output_dir: output_dir,
         concurrent_downloads: concurrent_downloads,
+        no_dupes,
     };
     download_spotify(options).await?;
     Ok(())

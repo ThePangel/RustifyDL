@@ -1,13 +1,13 @@
 use spotify_rs::model::track::Track;
 use spotify_rs::{ClientCredsClient, model::PlayableItem};
 use std::collections::HashMap;
+use crate::DownloadOptions;
 
 pub(crate) async fn fetch_track(
     id: &str,
-    client_id: &str,
-    client_secret: &str,
+    options: &DownloadOptions,
 ) -> Result<HashMap<String, Track>, Box<dyn std::error::Error + Send + Sync>> {
-    let spotify = ClientCredsClient::authenticate(client_id, client_secret).await?;
+    let spotify = ClientCredsClient::authenticate(&options.client_id, &options.client_secret).await?;
     let track = spotify_rs::track(id).get(&spotify).await?;
     let mut songs = HashMap::<String, Track>::new();
     songs.insert(
@@ -28,10 +28,9 @@ pub(crate) async fn fetch_track(
 
 pub(crate) async fn fetch_playlist(
     id: &str,
-    client_id: &str,
-    client_secret: &str,
+    options: &DownloadOptions,
 ) -> Result<HashMap<String, Track>, Box<dyn std::error::Error + Send + Sync>> {
-    let spotify = ClientCredsClient::authenticate(client_id, client_secret).await?;
+    let spotify = ClientCredsClient::authenticate(&options.client_id, &options.client_secret).await?;
     let mut songs = HashMap::<String, Track>::new();
 
     let playlist = spotify_rs::playlist(id).get(&spotify).await?;
@@ -95,10 +94,9 @@ pub(crate) async fn fetch_playlist(
 
 pub(crate) async fn fetch_album(
     id: &str,
-    client_id: &str,
-    client_secret: &str,
+    options: &DownloadOptions,
 ) -> Result<HashMap<String, Track>, Box<dyn std::error::Error + Send + Sync>> {
-    let spotify = ClientCredsClient::authenticate(client_id, client_secret).await?;
+    let spotify = ClientCredsClient::authenticate(&options.client_id, &options.client_secret).await?;
     let mut songs = HashMap::<String, Track>::new();
 
     let album = spotify_rs::album(id).get(&spotify).await?;
