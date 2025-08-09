@@ -2,6 +2,7 @@ use spotify_rs::model::track::Track;
 use spotify_rs::{ClientCredsClient, model::PlayableItem};
 use std::collections::HashMap;
 use crate::DownloadOptions;
+use log::info;
 
 pub(crate) async fn fetch_track(
     id: &str,
@@ -85,10 +86,10 @@ pub(crate) async fn fetch_playlist(
                 PlayableItem::Episode(_episode) => {}
             }
         } else {
-            println!("No song found.");
+            info!("No song found.");
         }
     }
-    println!("Found {} tracks in {}!", songs.len(), playlist.name);
+    info!("Found {} tracks in {}!", songs.len(), playlist.name);
     Ok(songs)
 }
 
@@ -119,9 +120,9 @@ pub(crate) async fn fetch_album(
                 track,
             );
         } else {
-            println!("No song found.");
+            info!("No song found.");
         }
     }
-    println!("Found {} tracks in {}!", songs.len(), album.name);
+    info!("Found {} tracks in {}!", songs.len(), album.name);
     Ok(songs)
 }

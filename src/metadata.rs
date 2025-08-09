@@ -39,21 +39,8 @@ pub(crate) async fn metadata(
     let path = format!("{}/{}.{}", options.output_dir, song, options.format.clone());
     let mut tagged_file = read_from_path(&path)?;
 
-    let tag = match tagged_file.primary_tag_mut() {
-        Some(primary_tag) => primary_tag,
-        None => {
-            if let Some(first_tag) = tagged_file.first_tag_mut() {
-                first_tag
-            } else {
-                let tag_type = tagged_file.primary_tag_type();
-
-                eprintln!("WARN: No tags found, creating a new tag of type `{tag_type:?}`");
-                tagged_file.insert_tag(Tag::new(tag_type));
-
-                tagged_file.primary_tag_mut().unwrap()
-            }
-        }
-    };
+    let tag_type = tagged_file.primary_tag_type();
+    let mut tag = Tag::new(tag_type);
 
     tag.set_title(track.name.clone());
     tag.set_artist(
@@ -107,11 +94,12 @@ pub(crate) async fn metadata(
     tag.set_track(track.track_number);
     tag.set_track_total(album.total_tracks);
     tag.set_year(album.release_date[..4].parse::<u32>().unwrap_or(0));
+    
+    tagged_file.insert_tag(tag);
         
     let write_options = WriteOptions::new()
         .use_id3v23(true)
-        .remove_others(false)
-        .respect_read_only(false);
+        .remove_others(true);
 
     tagged_file
         .save_to_path(path.clone(), write_options)

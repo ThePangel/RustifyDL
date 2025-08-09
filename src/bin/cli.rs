@@ -1,7 +1,8 @@
 use clap::Parser;
 use dirs;
+use log::{error, info};
 use regex::Regex;
-use rustify::{DownloadOptions, download_spotify};
+use rustifydl::{download_spotify, DownloadOptions};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
@@ -51,6 +52,16 @@ pub struct Cli {
         ])
     )]
     pub format: String,
+
+    #[arg(
+        long = "verbosity",
+        short,
+        default_value = "info",
+        value_parser = clap::builder::PossibleValuesParser::new([
+            "info", "debug", "error", "none", "full"
+        ])
+    )]
+    pub verbosity: String,
 }
 
 #[tokio::main]
@@ -73,6 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         no_dupes: args.no_dupes,
         bitrate: args.bitrate,
         format: args.format,
+        verbosity: args.verbosity
     };
     download_spotify(options).await?;
     Ok(())
@@ -93,9 +105,9 @@ async fn check_api_keys() -> Result<Config, Box<dyn std::error::Error + Send + S
         match toml::from_str::<Config>(&content) {
             Ok(parsed_keys) => keys = parsed_keys,
             Err(e) => {
-                eprintln!("Malformed config file: {}", e);
+                error!("Malformed config file: {}", e);
                 fs::remove_file(&config_path)?;
-                println!("The malformed config file has been deleted. Please re-enter your keys.");
+                info!("The malformed config file has been deleted. Please re-enter your keys.");
                 loop {
                     print!("Enter Client ID: ");
                     std::io::stdout().flush()?;

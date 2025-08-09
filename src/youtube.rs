@@ -1,3 +1,5 @@
+use crate::DownloadOptions;
+use log::info;
 use rustypipe::client::RustyPipe;
 use rustypipe::param::StreamFilter;
 use rustypipe_downloader::DownloaderBuilder;
@@ -6,7 +8,6 @@ use std::{fs};
 use std::process::Command;
 use std::time::Duration;
 use tokio::time::timeout;
-use crate::DownloadOptions;
 
 pub enum DownloadResult {
     Completed,
@@ -17,7 +18,9 @@ pub(crate) async fn search_yt(name: &str, options: &DownloadOptions) -> Result<D
     let rp = RustyPipe::new();
     let search_results = rp.query().music_search_tracks(name).await?;
 
-    download(search_results.items.items[0].id.as_str(), name, options).await?;
+    if let DownloadResult::Skipped = download(search_results.items.items[0].id.as_str(), name, options).await? {
+        return Ok(DownloadResult::Skipped)
+    }
     Ok(DownloadResult::Completed)
 }
 
@@ -29,7 +32,7 @@ async fn download(id: &str, name: &str, options: &DownloadOptions) -> Result<Dow
     let mut file = PathBuf::from(format!("{}/temp/{}", options.output_dir, name));
     let processed_file =PathBuf::from(format!("{}/{}.{}", options.output_dir, name, options.format.clone()));
     if processed_file.exists() {
-        println!("File already exists, skipping: {}", name);
+        info!("File already exists, skipping: {}", name);
         return Ok(DownloadResult::Skipped);
     }
    
@@ -98,6 +101,6 @@ fn convert_to_mp3(
         )));
     }
    
-    println!("Completed: {}", name);
+    info!("Completed: {}", name);
     Ok(())
 }

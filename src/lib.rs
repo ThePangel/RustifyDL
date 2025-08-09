@@ -4,8 +4,11 @@ use {
         spotify::{fetch_album, fetch_playlist, fetch_track},
         youtube::{DownloadResult, search_yt},
     },
+    env_logger,
+    log::{error, info},
     regex::Regex,
     spotify_rs::model::track::Track,
+    std::io::Write,
     std::{collections::HashMap, fs, sync::Arc},
     tokio::sync::Semaphore,
 };
@@ -23,6 +26,7 @@ pub struct DownloadOptions {
     pub no_dupes: bool,
     pub bitrate: String,
     pub format: String,
+    pub verbosity: String,
 }
 
 fn sanitize_filename(name: &str) -> String {
@@ -65,7 +69,7 @@ fn is_valid_spotify_url(url: &str) -> Option<(SpotifyUrlType, String)> {
             } else if url.contains("playlist") {
                 return Some((SpotifyUrlType::Playlist, id));
             } else if url.contains("artist") {
-                eprintln!("You wouldn't download an Artist!");
+                error!("You wouldn't download an Artist!");
                 return Some((SpotifyUrlType::Artist, id));
             }
         }
@@ -76,6 +80,32 @@ fn is_valid_spotify_url(url: &str) -> Option<(SpotifyUrlType, String)> {
 pub async fn download_spotify(
     options: DownloadOptions,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    match options.verbosity.clone().as_str() {
+        "full" => env_logger::Builder::new()
+            .format(|buf, record| writeln!(buf, "{}", record.args()))
+            .filter_level(log::LevelFilter::Trace)
+            .init(),
+        "info" => env_logger::Builder::new()
+            .format(|buf, record| writeln!(buf, "{}", record.args()))
+            .filter_level(log::LevelFilter::Off)
+            .filter_module("rustifydl", log::LevelFilter::Info) 
+            .init(),
+        "debug" => env_logger::Builder::new()
+            .format(|buf, record| writeln!(buf, "{}", record.args()))
+            .filter_level(log::LevelFilter::Debug)
+            .filter_module("spotify_rs", log::LevelFilter::Warn)
+            .init(),
+        "none" => env_logger::Builder::new()
+            .format(|buf, record| writeln!(buf, "{}", record.args()))
+            .filter_level(log::LevelFilter::Off)
+            .init(),
+        _ => env_logger::Builder::new()
+            .format(|buf, record| writeln!(buf, "{}", record.args()))
+            .filter_level(log::LevelFilter::Info)
+            .filter_module("spotify_rs", log::LevelFilter::Warn)
+            .filter_module("rustypipe_downloader", log::LevelFilter::Warn)
+            .init(),
+    };
     let (url_type, id) = is_valid_spotify_url(&options.url).ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid Spotify URL")
     })?;
@@ -117,10 +147,11 @@ async fn download_and_tag_tracks(
             no_dupes: options.no_dupes,
             bitrate: options.bitrate.clone(),
             format: options.format.clone(),
+            verbosity: options.verbosity.clone(),
         };
         let handle = tokio::spawn(async move {
             let _permit = semaphore.acquire().await.unwrap();
-            println!("{}/{} Starting download: {}", i + 1, lenght, name);
+            info!("{}/{} Starting download: {}", i + 1, lenght, name);
             if let DownloadResult::Completed = search_yt(&name, &options_cloned).await? {
                 metadata(&name, &track, &options_cloned).await?;
             }
@@ -133,11 +164,11 @@ async fn download_and_tag_tracks(
     for handle in handles {
         match handle.await {
             Ok(Ok(())) => {}
-            Ok(Err(e)) => eprintln!("Task failed: {}", e),
-            Err(e) => eprintln!("Join error: {}", e),
+            Ok(Err(e)) => error!("Task failed: {}", e),
+            Err(e) => error!("Join error: {}", e),
         }
     }
     fs::remove_dir_all(format!("{}/temp", options.output_dir))?;
-    println!("Finished!");
+    info!("Finished!");
     Ok(())
 }
