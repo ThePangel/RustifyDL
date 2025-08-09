@@ -105,17 +105,14 @@ async fn download_and_tag_tracks(
         let semaphore = semaphore.clone();
         let name = sanitize_filename(&name.as_str());
         let track = track.clone();
-        let client_id = options.client_id.to_string();
-        let client_secret = options.client_secret.to_string();
-        let output_dir = options.output_dir.to_string();
-        let no_dupes = options.no_dupes;
+
         let options_cloned = DownloadOptions {
             url: options.url.clone(),
-            client_id: client_id.clone(),
-            client_secret: client_secret.clone(),
-            output_dir,
+            client_id: options.client_id.to_string().clone(),
+            client_secret: options.client_secret.to_string().clone(),
+            output_dir: options.output_dir.to_string(),
             concurrent_downloads: options.concurrent_downloads,
-            no_dupes,
+            no_dupes: options.no_dupes,
         };
         let handle = tokio::spawn(async move {
             let _permit = semaphore.acquire().await.unwrap();
