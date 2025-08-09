@@ -21,6 +21,8 @@ pub struct DownloadOptions {
     pub output_dir: String,
     pub concurrent_downloads: usize,
     pub no_dupes: bool,
+    pub bitrate: String,
+    pub format: String,
 }
 
 fn sanitize_filename(name: &str) -> String {
@@ -113,10 +115,12 @@ async fn download_and_tag_tracks(
             output_dir: options.output_dir.to_string(),
             concurrent_downloads: options.concurrent_downloads,
             no_dupes: options.no_dupes,
+            bitrate: options.bitrate.clone(),
+            format: options.format.clone(),
         };
         let handle = tokio::spawn(async move {
             let _permit = semaphore.acquire().await.unwrap();
-            println!("{}/{} Starting download: {}", i, lenght, name);
+            println!("{}/{} Starting download: {}", i + 1, lenght, name);
             if let DownloadResult::Completed = search_yt(&name, &options_cloned).await? {
                 metadata(&name, &track, &options_cloned).await?;
             }

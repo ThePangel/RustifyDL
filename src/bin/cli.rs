@@ -4,8 +4,8 @@ use regex::Regex;
 use rustify::{DownloadOptions, download_spotify};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use tokio;
 use std::io::Write;
+use tokio;
 
 #[derive(Deserialize, Serialize)]
 struct Config {
@@ -31,6 +31,26 @@ pub struct Cli {
 
     #[arg(long = "no-dupes", action = clap::ArgAction::SetTrue)]
     pub no_dupes: bool,
+
+    #[arg(
+        long = "bitrate",
+        short,
+        default_value = "192k",
+        value_parser = clap::builder::PossibleValuesParser::new([
+            "8k", "16k", "24k", "32k", "40k", "48k", "64k", "80k", "96k", "112k", "128k", "160k", "192k", "224k", "256k", "320k"
+        ])
+    )]
+    pub bitrate: String,
+
+    #[arg(
+        long = "format",
+        short,
+        default_value = "mp3",
+        value_parser = clap::builder::PossibleValuesParser::new([
+            "mp3", "flac", "ogg", "opus", "m4a", "wav"
+        ])
+    )]
+    pub format: String,
 }
 
 #[tokio::main]
@@ -51,6 +71,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         output_dir: args.output_dir,
         concurrent_downloads: args.concurrent_downloads,
         no_dupes: args.no_dupes,
+        bitrate: args.bitrate,
+        format: args.format,
     };
     download_spotify(options).await?;
     Ok(())
@@ -67,7 +89,7 @@ async fn check_api_keys() -> Result<Config, Box<dyn std::error::Error + Send + S
     let mut client_secret = String::new();
     if config_path.exists() && config_path.is_file() && fs::metadata(&config_path)?.len() != 0 {
         let content = fs::read_to_string(&config_path)?;
-        let mut keys;
+        let keys;
         match toml::from_str::<Config>(&content) {
             Ok(parsed_keys) => keys = parsed_keys,
             Err(e) => {

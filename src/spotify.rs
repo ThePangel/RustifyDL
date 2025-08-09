@@ -122,6 +122,6 @@ pub(crate) async fn fetch_album(
             println!("No song found.");
         }
     }
-    println!("Found {} tracks!", songs.len());
+    println!("Found {} tracks in {}!", songs.len(), album.name);
     Ok(songs)
 }

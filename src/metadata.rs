@@ -36,7 +36,7 @@ pub(crate) async fn metadata(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let spotify = ClientCredsClient::authenticate(options.client_id.clone(), options.client_secret.clone()).await?;
 
-    let path = format!("{}/{}.mp3", options.output_dir, song);
+    let path = format!("{}/{}.{}", options.output_dir, song, options.format.clone());
     let mut tagged_file = read_from_path(&path)?;
 
     let tag = match tagged_file.primary_tag_mut() {
