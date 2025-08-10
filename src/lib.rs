@@ -27,6 +27,7 @@ pub struct DownloadOptions {
     pub bitrate: String,
     pub format: String,
     pub verbosity: String,
+    pub no_tag: bool,
 }
 
 fn sanitize_filename(name: &str) -> String {
@@ -148,12 +149,15 @@ async fn download_and_tag_tracks(
             bitrate: options.bitrate.clone(),
             format: options.format.clone(),
             verbosity: options.verbosity.clone(),
+            no_tag: options.no_tag,
         };
         let handle = tokio::spawn(async move {
             let _permit = semaphore.acquire().await.unwrap();
             info!("{}/{} Starting download: {}", i + 1, lenght, name);
             if let DownloadResult::Completed = search_yt(&name, &options_cloned).await? {
-                metadata(&name, &track, &options_cloned).await?;
+                if !options_cloned.no_tag {
+                    metadata(&name, &track, &options_cloned).await?;
+                }
             }
 
             Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
