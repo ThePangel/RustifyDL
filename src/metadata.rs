@@ -10,6 +10,8 @@
 //!
 //! Artwork is embedded as the front cover when the container allows it.
 
+use std::path::PathBuf;
+
 use lofty::{
     config::WriteOptions,
     file::{AudioFile, TaggedFileExt},
@@ -59,7 +61,7 @@ pub async fn metadata(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let spotify = ClientCredsClient::authenticate(options.client_id.clone(), options.client_secret.clone()).await?;
 
-    let path = format!("{}/{}.{}", options.output_dir, song, options.format.clone());
+    let path = PathBuf::from(format!("{}/{}.{}", options.output_dir, song, options.format.clone()));
     let mut tagged_file = read_from_path(&path)?;
 
     let tag_type = tagged_file.primary_tag_type();

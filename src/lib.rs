@@ -221,12 +221,7 @@ async fn download_and_tag_tracks(
     let mut handles = Vec::new();
     let semaphore = Arc::new(Semaphore::new(options.concurrent_downloads));
     let lenght = tracks.clone().len();
-    for (i, (name, track)) in tracks.iter().enumerate() {
-        let semaphore = semaphore.clone();
-        let name = sanitize_filename(&name.as_str());
-        let track = track.clone();
-
-        let options_cloned = DownloadOptions {
+    let options_cloned = Arc::new(DownloadOptions {
             url: options.url.clone(),
             client_id: options.client_id.to_string().clone(),
             client_secret: options.client_secret.to_string().clone(),
@@ -238,13 +233,18 @@ async fn download_and_tag_tracks(
             verbosity: options.verbosity.clone(),
             no_tag: options.no_tag,
             timeout: options.timeout,
-        };
+        });
+    for (i, (name, track)) in tracks.iter().enumerate() {
+        let semaphore = semaphore.clone();
+        let name = sanitize_filename(&name.as_str());
+        let track = track.clone();
+        let options_cloned = Arc::clone(&options_cloned);
         let handle = tokio::spawn(async move {
             let _permit = semaphore.acquire().await.unwrap();
             info!("{}/{} Starting download: {}", i + 1, lenght, name);
-            if let DownloadResult::Completed = search_yt(&name, &options_cloned).await? {
+            if let DownloadResult::Completed = search_yt(&name, options_cloned.as_ref()).await? {
                 if !options_cloned.no_tag {
-                    metadata(&name, &track, &options_cloned).await?;
+                    metadata(&name, &track, options_cloned.as_ref()).await?;
                 }
             }
 
