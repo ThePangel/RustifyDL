@@ -44,7 +44,6 @@ pub async fn fetch_track(
 /// false and a duplicate title is encountered, the album name is appended to
 /// disambiguate entries.
 /// Returns a HashMap with the track name as the key and the `` object.
-
 pub async fn fetch_playlist(
     id: &str,
     options: &DownloadOptions,

@@ -1,12 +1,10 @@
 use clap::Parser;
-use dirs;
 use log::{error, info};
 use regex::Regex;
 use rustifydl::{DownloadOptions, download_spotify};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
-use tokio;
 
 #[derive(Deserialize, Serialize)]
 struct Config {
@@ -109,11 +107,10 @@ async fn check_api_keys() -> Result<Config, Box<dyn std::error::Error + Send + S
     let mut client_secret = String::new();
     if config_path.exists() && config_path.is_file() && fs::metadata(&config_path)?.len() != 0 {
         let content = fs::read_to_string(&config_path)?;
-        let keys;
-        match toml::from_str::<Config>(&content) {
-            Ok(parsed_keys) => keys = parsed_keys,
+        let keys = match toml::from_str::<Config>(&content) {
+            Ok(parsed_keys) => parsed_keys,
             Err(e) => {
-                error!("Malformed config file: {}", e);
+                error!("Malformed config file: {e}");
                 fs::remove_file(&config_path)?;
                 info!("The malformed config file has been deleted. Please re-enter your keys.");
                 loop {
@@ -190,13 +187,13 @@ async fn check_api_keys() -> Result<Config, Box<dyn std::error::Error + Send + S
             }
         }
 
-        if verify_key(&keys.client_id.trim()) && verify_key(&&keys.client_secret.trim()) {
-            return Ok(keys);
+        if verify_key(keys.client_id.trim()) && verify_key(keys.client_secret.trim()) {
+            Ok(keys)
         } else {
-            return Err(Box::new(std::io::Error::new(
+            Err(Box::new(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "Keys are not valid! Check the config file!",
-            )));
+            )))
         }
     } else {
         println!(
@@ -231,7 +228,7 @@ async fn check_api_keys() -> Result<Config, Box<dyn std::error::Error + Send + S
         fs::write(&config_path, value)?;
         println!("Configuration saved to: {}", config_path.display());
 
-        return Ok(keys);
+        Ok(keys)
     }
 }
 

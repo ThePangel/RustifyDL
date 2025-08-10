@@ -38,10 +38,9 @@ use {
         spotify::{fetch_album, fetch_playlist, fetch_track},
         youtube::{DownloadResult, search_yt},
     },
-    env_logger,
     indicatif::{MultiProgress, ProgressBar, ProgressStyle},
     indicatif_log_bridge::LogWrapper,
-    log::{error, info},
+    log::{error, info, LevelFilter},
     regex::Regex,
     spotify_rs::model::track::Track,
     std::{
@@ -185,36 +184,36 @@ pub async fn download_spotify(
             let mut builder = env_logger::Builder::new();
             builder
                 .format(|buf, record| writeln!(buf, "{}", record.args()))
-                .filter_level(log::LevelFilter::Trace);
+                .filter_level(LevelFilter::Trace);
             builder
         }
         "info" => {
             let mut builder = env_logger::Builder::new();
             builder
                 .format(|buf, record| writeln!(buf, "{}", record.args()))
-                .filter_level(log::LevelFilter::Off)
-                .filter_module("rustifydl", log::LevelFilter::Info);
+                .filter_level(LevelFilter::Off)
+                .filter_module("rustifydl", LevelFilter::Info);
             builder
         }
         "debug" => {
             let mut builder = env_logger::Builder::new();
-            builder.filter_level(log::LevelFilter::Debug);
+            builder.filter_level(LevelFilter::Debug);
             builder
         }
         "none" => {
             let mut builder = env_logger::Builder::new();
             builder
                 .format(|buf, record| writeln!(buf, "{}", record.args()))
-                .filter_level(log::LevelFilter::Off);
+                .filter_level(LevelFilter::Off);
             builder
         }
         _ => {
             let mut builder = env_logger::Builder::new();
             builder
                 .format(|buf, record| writeln!(buf, "{}", record.args()))
-                .filter_level(log::LevelFilter::Info)
-                .filter_module("spotify_rs", log::LevelFilter::Warn)
-                .filter_module("rustypipe_downloader", log::LevelFilter::Warn);
+                .filter_level(LevelFilter::Info)
+                .filter_module("spotify_rs", LevelFilter::Warn)
+                .filter_module("rustypipe_downloader", LevelFilter::Warn);
             builder
         }
     };
@@ -269,7 +268,7 @@ async fn download_and_tag_tracks(
 
     for (i, (name, track)) in tracks.iter().enumerate() {
         let semaphore = semaphore.clone();
-        let name = sanitize_filename(&name.as_str());
+        let name = sanitize_filename(name.as_str());
         let track = track.clone();
         let options_cloned = Arc::clone(&options_cloned);
         let multi = Arc::clone(&multi);
@@ -286,10 +285,10 @@ async fn download_and_tag_tracks(
                     metadata(&name, &track, options_cloned.as_ref()).await?;
                 }
             } else {
-                bar.finish_with_message(format!("File already exists, skipping!: {}", name));
+                bar.finish_with_message(format!("File already exists, skipping!: {name}"));
                 return Ok::<(), Box<dyn std::error::Error + Send + Sync>>(());
             }
-            bar.finish_with_message(format!("Finished {}!", name));
+            bar.finish_with_message(format!("Finished {name}!"));
             Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
         });
         handles.push(handle);
@@ -298,8 +297,8 @@ async fn download_and_tag_tracks(
     for handle in handles {
         match handle.await {
             Ok(Ok(())) => {}
-            Ok(Err(e)) => error!("Task failed: {}", e),
-            Err(e) => error!("Join error: {}", e),
+            Ok(Err(e)) => error!("Task failed: {e}"),
+            Err(e) => error!("Join error: {e}"),
         }
     }
     if PathBuf::from(format!("{}/temp", options.output_dir)).exists() {

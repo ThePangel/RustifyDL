@@ -63,7 +63,7 @@ pub async fn download(
         options.format.clone()
     ));
     if processed_file.exists() {
-        info!("File already exists, skipping: {}", name);
+        info!("File already exists, skipping: {name}");
         return Ok(DownloadResult::Skipped);
     }
 
@@ -75,7 +75,7 @@ pub async fn download(
             if let Ok(value) = inner_result {
                 file = value.dest;
             } else if let Err(e) = inner_result {
-                return Err(format!("Download library error for {}: {}", name, e).into());
+                return Err(format!("Download library error for {name}: {e}").into());
             }
         }
         Err(_) => {
@@ -98,15 +98,12 @@ pub async fn download(
                 .to_str()
                 .ok_or("Invalid UTF-8 in file path")?,
             name,
-            &options,
+            options,
         )?;
     } else {
         return Err(Box::new(std::io::Error::new(
             std::io::ErrorKind::InvalidFilename,
-            format!(
-                "Download for {} failed or didn't start: File not Found",
-                name
-            ),
+            format!("Download for {name} failed or didn't start: File not Found"),
         )));
     }
 
@@ -137,8 +134,7 @@ fn convert_to_mp3(
         .output()?;
 
     if !output.status.success() {
-        return Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        return Err(Box::new(std::io::Error::other(
             format!(
                 "FFmpeg conversion failed: {}",
                 String::from_utf8_lossy(&output.stderr)
@@ -146,6 +142,6 @@ fn convert_to_mp3(
         )));
     }
 
-    info!("Completed: {}", name);
+    info!("Completed: {name}");
     Ok(())
 }
