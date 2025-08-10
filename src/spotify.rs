@@ -1,10 +1,20 @@
+//! Spotify helpers for resolving tracks, albums, and playlists.
+//!
+//! Input: a Spotify ID string and authenticated client credentials (provided
+//! via [`DownloadOptions`]).
+//! Output: a `HashMap<String, Track>` keyed by a human-friendly display name,
+//! e.g. `"Artists - Title"` or with dupes, if there are two of the same file `"Artists - Album - Title"`.
+
 use spotify_rs::model::track::Track;
 use spotify_rs::{ClientCredsClient, model::PlayableItem};
 use std::collections::HashMap;
 use crate::DownloadOptions;
 use log::info;
 
-pub(crate) async fn fetch_track(
+/// Fetch a single track by Spotify ID.
+///
+/// Returns a map with one entry mapping a display name to its `spotify_rs::model::track::Track`.
+pub async fn fetch_track(
     id: &str,
     options: &DownloadOptions,
 ) -> Result<HashMap<String, Track>, Box<dyn std::error::Error + Send + Sync>> {
@@ -27,7 +37,14 @@ pub(crate) async fn fetch_track(
     Ok(songs)
 }
 
-pub(crate) async fn fetch_playlist(
+/// Fetch all tracks from a playlist by ID.
+///
+/// The result map keys are display names. If `DownloadOptions::no_dupes` is
+/// false and a duplicate title is encountered, the album name is appended to
+/// disambiguate entries.
+/// Returns a HashMap with the track name as the key and the `` object. 
+
+pub async fn fetch_playlist(
     id: &str,
     options: &DownloadOptions,
 ) -> Result<HashMap<String, Track>, Box<dyn std::error::Error + Send + Sync>> {
@@ -93,7 +110,13 @@ pub(crate) async fn fetch_playlist(
     Ok(songs)
 }
 
-pub(crate) async fn fetch_album(
+/// Fetch all tracks from a Album by ID.
+///
+/// The result map keys are display names. If `DownloadOptions::no_dupes` is
+/// false and a duplicate title is encountered, the album name is appended to
+/// disambiguate entries.
+/// Returns a HashMap with the track name as the key and the `spotify_rs::model::track::Track` object. 
+pub async fn fetch_album(
     id: &str,
     options: &DownloadOptions,
 ) -> Result<HashMap<String, Track>, Box<dyn std::error::Error + Send + Sync>> {

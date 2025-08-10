@@ -1,3 +1,15 @@
+//! Metadata tagging utilities for RustifyDL.
+//!
+//! This module writes clean, player-friendly tags to downloaded audio files.
+//!
+//! Tag strategy by format:
+//! - MP3: Write ID3v2.3 for maximum compatibility.
+//! - FLAC/OGG/OPUS: Write native Vorbis Comments.
+//! - MP4/M4A: Write iTunes/MP4 `ilst` atoms.
+//! - WAV: Where supported, write RIFF INFO.
+//!
+//! Artwork is embedded as the front cover when the container allows it.
+
 use lofty::{
     config::WriteOptions,
     file::{AudioFile, TaggedFileExt},
@@ -13,7 +25,9 @@ use spotify_rs::{
 
 use crate::DownloadOptions;
 
-
+/// Try to detect the image MIME type from raw bytes.
+///
+/// Falls back to JPEG when unknown.
 fn detect_image_mime_type(bytes: &[u8]) -> MimeType {
     if bytes.len() < 4 {
         return MimeType::Jpeg;
@@ -29,7 +43,16 @@ fn detect_image_mime_type(bytes: &[u8]) -> MimeType {
 
     MimeType::Jpeg
 }
-pub(crate) async fn metadata(
+
+/// Write metadata tags and artwork to the given song file.
+///
+/// Behavior:
+/// - Fetches any missing context (e.g., album) from Spotify.
+/// - Builds a fresh tag and saves using the native container format.
+/// - Embeds front cover artwork and sets artist/album/track/disc/genre/year.
+///
+/// Returns an error if the file cannot be tagged or network requests fail.
+pub async fn metadata(
     song: &String,
     track: &Track,
     options: &DownloadOptions,
@@ -55,7 +78,6 @@ pub(crate) async fn metadata(
     let album = spotify_rs::album(track.album.id.clone())
         .get(&spotify)
         .await?;
- 
     if !album.genres.is_empty() {
         tag.set_genre(
             album
@@ -97,9 +119,12 @@ pub(crate) async fn metadata(
     
     tagged_file.insert_tag(tag);
         
-    let write_options = WriteOptions::new()
-        .use_id3v23(true)
+    // Use ID3v2.3 only for MP3; otherwise rely on native tags.
+    let mut write_options = WriteOptions::new()
         .remove_others(true);
+    if options.format.eq_ignore_ascii_case("mp3") {
+        write_options = write_options.use_id3v23(true);
+    }
 
     tagged_file
         .save_to_path(path.clone(), write_options)

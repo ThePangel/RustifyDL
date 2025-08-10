@@ -1,3 +1,36 @@
+//!
+//! RustifyDL library API
+//!
+//! High-level helpers to resolve Spotify URLs to tracks, fetch audio from
+//! YouTube, and write clean tags to files.
+//!
+//! Key items:
+//! - [`DownloadOptions`] input options
+//! - [`download_spotify`] to drive the whole flow asynchronously
+//!
+//! Examples
+//! ```no_run
+//! use rustifydl::{download_spotify, DownloadOptions};
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+//!     let opts = DownloadOptions {
+//!         url: "https://open.spotify.com/album/xxxxxxxx".into(),
+//!         client_id: "<client_id>".into(),
+//!         client_secret: "<client_secret>".into(),
+//!         output_dir: "./output".into(),
+//!         concurrent_downloads: 6,
+//!         no_dupes: true,
+//!         bitrate: "192k".into(),
+//!         format: "mp3".into(),
+//!         verbosity: "info".into(),
+//!         no_tag: false,
+//!     };
+//!     download_spotify(opts).await
+//! }
+//! ```
+
+#![allow(clippy::module_inception)]
 use {
     crate::{
         metadata::metadata,
@@ -17,16 +50,29 @@ pub mod metadata;
 pub mod spotify;
 pub mod youtube;
 
+/// Options used to control how downloads are performed.
+///
+/// These map to CLI flags in the binary.
 pub struct DownloadOptions {
+    /// Spotify URL (track/album/playlist)
     pub url: String,
+    /// Spotify Client ID
     pub client_id: String,
+    /// Spotify Client Secret
     pub client_secret: String,
+    /// Destination folder for audio files
     pub output_dir: String,
+    /// Maximum number of concurrent downloads
     pub concurrent_downloads: usize,
+    /// Skip duplicate tracks across collections
     pub no_dupes: bool,
+    /// Target audio bitrate for ffmpeg (e.g., "192k")
     pub bitrate: String,
+    /// Output format/extension (e.g., "mp3")
     pub format: String,
+    /// Log verbosity: one of "full", "debug", "info", "none"
     pub verbosity: String,
+    /// Don't write audio tags or cover art
     pub no_tag: bool,
 }
 
@@ -35,7 +81,18 @@ fn sanitize_filename(name: &str) -> String {
     re.replace_all(name.trim(), "").to_string()
 }
 
-pub(crate) fn extract_id_from_url(url: &str) -> Option<String> {
+/// Extract a Spotify ID from a typical Spotify URL.
+///
+/// Supports `track/`, `album/`, `playlist/`, and `artist/` URL shapes.
+/// Returns `Some(id)` when an ID is present; otherwise `None`.
+///
+/// Example
+/// ```
+/// use rustifydl::extract_id_from_url;
+/// let id = extract_id_from_url("https://open.spotify.com/track/3n3Ppam7vgaVa1iaRUc9Lp");
+/// assert!(id.is_some());
+/// ```
+pub fn extract_id_from_url(url: &str) -> Option<String> {
     let re = Regex::new(r"(track|album|playlist|artist)/([a-zA-Z0-9]+)").unwrap();
 
     if let Some(captures) = re.captures(url) {
@@ -78,6 +135,34 @@ fn is_valid_spotify_url(url: &str) -> Option<(SpotifyUrlType, String)> {
     None
 }
 
+/// Resolve a Spotify URL and download all corresponding tracks.
+///
+/// Steps:
+/// 1. Determine URL type (track/album/playlist) and fetch tracks from Spotify.
+/// 2. For each track, search YouTube and download best audio stream.
+/// 3. Optionally write tags and artwork (`no_tag == false`).
+///
+/// Example
+/// ```no_run
+/// use rustifydl::{download_spotify, DownloadOptions};
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+/// let opts = DownloadOptions {
+///     url: "https://open.spotify.com/playlist/xxxxxxxx".into(),
+///     client_id: "<client_id>".into(),
+///     client_secret: "<client_secret>".into(),
+///     output_dir: "./output".into(),
+///     concurrent_downloads: 8,
+///     no_dupes: true,
+///     bitrate: "192k".into(),
+///     format: "mp3".into(),
+///     verbosity: "info".into(),
+///     no_tag: false,
+/// };
+/// download_spotify(opts).await?;
+/// # Ok(())
+/// # }
+/// ```
 pub async fn download_spotify(
     options: DownloadOptions,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

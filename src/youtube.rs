@@ -1,3 +1,12 @@
+//! YouTube search and download helpers.
+//!
+//! Behavior:
+//! - Search YouTube Music for a best-effort match to the provided name.
+//! - Download an audio-only stream and write a temporary file to `output_dir/temp`.
+//! - Transcode with ffmpeg to the final format and move to `output_dir`.
+//! - Skip work if the final output already exists.
+
+
 use crate::DownloadOptions;
 use log::info;
 use rustypipe::client::RustyPipe;
@@ -9,12 +18,17 @@ use std::process::Command;
 use std::time::Duration;
 use tokio::time::timeout;
 
+/// Result of a download attempt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DownloadResult {
+    /// File was downloaded and processed successfully.
     Completed,
+    /// File already existed and was skipped.
     Skipped,
 }
 
-pub(crate) async fn search_yt(name: &str, options: &DownloadOptions) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
+/// Search YouTube Music for `name` and calls the `rustifydl::youtube::download` fuction to download the video.
+pub async fn search_yt(name: &str, options: &DownloadOptions) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
     let rp = RustyPipe::new();
     let search_results = rp.query().music_search_tracks(name).await?;
 
@@ -24,7 +38,11 @@ pub(crate) async fn search_yt(name: &str, options: &DownloadOptions) -> Result<D
     Ok(DownloadResult::Completed)
 }
 
-async fn download(id: &str, name: &str, options: &DownloadOptions) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
+/// Download by YouTube video id and transcode to the target format using ffmpeg.
+///
+/// The temporary file is saved under `output_dir/temp/` and removed on timeout
+/// or failure.
+pub async fn download(id: &str, name: &str, options: &DownloadOptions) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
     fs::create_dir_all(options.output_dir.clone())?;
 
     let dl = DownloaderBuilder::new().build();
@@ -72,6 +90,10 @@ async fn download(id: &str, name: &str, options: &DownloadOptions) -> Result<Dow
     Ok(DownloadResult::Completed)
 }
 
+/// Transcode the intermediate download to the desired output format using ffmpeg.
+///
+/// Uses `-b:a <bitrate>` and `-threads 0` to allow ffmpeg to use all cores. On
+/// failure, the stderr from ffmpeg is surfaced in the error.
 fn convert_to_mp3(
     input_file: &str,
     output_file: &str,
@@ -80,6 +102,7 @@ fn convert_to_mp3(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let output = Command::new("ffmpeg")
         .args([
+
             "-i",
             input_file,
             "-b:a",
