@@ -25,6 +25,7 @@
 //!         format: "mp3".into(),
 //!         verbosity: "info".into(),
 //!         no_tag: false,
+//!         timeout: 180,
 //!     };
 //!     download_spotify(opts).await
 //! }
@@ -168,6 +169,7 @@ fn is_valid_spotify_url(url: &str) -> Option<(SpotifyUrlType, String)> {
 ///     format: "mp3".into(),
 ///     verbosity: "info".into(),
 ///     no_tag: false,
+///     timeout: 180,
 /// };
 /// download_spotify(opts).await?;
 /// # Ok(())
