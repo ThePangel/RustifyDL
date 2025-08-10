@@ -2,7 +2,7 @@ use clap::Parser;
 use dirs;
 use log::{error, info};
 use regex::Regex;
-use rustifydl::{download_spotify, DownloadOptions};
+use rustifydl::{DownloadOptions, download_spotify};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
@@ -65,6 +65,9 @@ pub struct Cli {
 
     #[arg(long = "no-tag", action = clap::ArgAction::SetTrue)]
     pub no_tag: bool,
+
+    #[arg(long = "timeout", short, default_value_t = 180)]
+    pub timeout: u64,
 }
 
 #[tokio::main]
@@ -89,6 +92,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         format: args.format,
         verbosity: args.verbosity,
         no_tag: args.no_tag,
+        timeout: args.timeout,
     };
     download_spotify(options).await?;
     Ok(())

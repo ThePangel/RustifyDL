@@ -6,14 +6,13 @@
 //! - Transcode with ffmpeg to the final format and move to `output_dir`.
 //! - Skip work if the final output already exists.
 
-
 use crate::DownloadOptions;
 use log::info;
 use rustypipe::client::RustyPipe;
 use rustypipe::param::StreamFilter;
 use rustypipe_downloader::DownloaderBuilder;
+use std::fs;
 use std::path::PathBuf;
-use std::{fs};
 use std::process::Command;
 use std::time::Duration;
 use tokio::time::timeout;
@@ -28,12 +27,17 @@ pub enum DownloadResult {
 }
 
 /// Search YouTube Music for `name` and calls the `rustifydl::youtube::download` fuction to download the video.
-pub async fn search_yt(name: &str, options: &DownloadOptions) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
+pub async fn search_yt(
+    name: &str,
+    options: &DownloadOptions,
+) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
     let rp = RustyPipe::new();
     let search_results = rp.query().music_search_tracks(name).await?;
 
-    if let DownloadResult::Skipped = download(search_results.items.items[0].id.as_str(), name, options).await? {
-        return Ok(DownloadResult::Skipped)
+    if let DownloadResult::Skipped =
+        download(search_results.items.items[0].id.as_str(), name, options).await?
+    {
+        return Ok(DownloadResult::Skipped);
     }
     Ok(DownloadResult::Completed)
 }
@@ -42,22 +46,31 @@ pub async fn search_yt(name: &str, options: &DownloadOptions) -> Result<Download
 ///
 /// The temporary file is saved under `output_dir/temp/` and removed on timeout
 /// or failure.
-pub async fn download(id: &str, name: &str, options: &DownloadOptions) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
+pub async fn download(
+    id: &str,
+    name: &str,
+    options: &DownloadOptions,
+) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
     fs::create_dir_all(options.output_dir.clone())?;
 
     let dl = DownloaderBuilder::new().build();
     let filter_audio = StreamFilter::new().no_video();
     let mut file = PathBuf::from(format!("{}/temp/{}", options.output_dir, name));
-    let processed_file =PathBuf::from(format!("{}/{}.{}", options.output_dir, name, options.format.clone()));
+    let processed_file = PathBuf::from(format!(
+        "{}/{}.{}",
+        options.output_dir,
+        name,
+        options.format.clone()
+    ));
     if processed_file.exists() {
         info!("File already exists, skipping: {}", name);
         return Ok(DownloadResult::Skipped);
     }
-   
+
     let download_builder = dl.id(id).stream_filter(filter_audio).to_file(&file);
     let download_status = download_builder.download();
 
-    match timeout(Duration::from_secs(180), download_status).await {
+    match timeout(Duration::from_secs(options.timeout), download_status).await {
         Ok(inner_result) => {
             if let Ok(value) = inner_result {
                 file = value.dest;
@@ -71,12 +84,22 @@ pub async fn download(id: &str, name: &str, options: &DownloadOptions) -> Result
             }
             return Err(Box::new(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
-                format!("Download for {} timed out after 3 minutes", name),
+                format!(
+                    "Download for {} timed out after {} seconds",
+                    name, options.timeout
+                ),
             )));
         }
     }
     if file.exists() {
-        convert_to_mp3(file.to_str().ok_or("Invalid UTF-8 in file path")?, processed_file.to_str().ok_or("Invalid UTF-8 in file path")?, name, &options)?;
+        convert_to_mp3(
+            file.to_str().ok_or("Invalid UTF-8 in file path")?,
+            processed_file
+                .to_str()
+                .ok_or("Invalid UTF-8 in file path")?,
+            name,
+            &options,
+        )?;
     } else {
         return Err(Box::new(std::io::Error::new(
             std::io::ErrorKind::InvalidFilename,
@@ -102,7 +125,6 @@ fn convert_to_mp3(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let output = Command::new("ffmpeg")
         .args([
-
             "-i",
             input_file,
             "-b:a",
@@ -123,7 +145,7 @@ fn convert_to_mp3(
             ),
         )));
     }
-   
+
     info!("Completed: {}", name);
     Ok(())
 }

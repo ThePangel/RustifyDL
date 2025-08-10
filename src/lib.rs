@@ -74,6 +74,8 @@ pub struct DownloadOptions {
     pub verbosity: String,
     /// Don't write audio tags or cover art
     pub no_tag: bool,
+    /// Per-download timeout in seconds for YouTube download
+    pub timeout: u64,
 }
 
 fn sanitize_filename(name: &str) -> String {
@@ -235,6 +237,7 @@ async fn download_and_tag_tracks(
             format: options.format.clone(),
             verbosity: options.verbosity.clone(),
             no_tag: options.no_tag,
+            timeout: options.timeout,
         };
         let handle = tokio::spawn(async move {
             let _permit = semaphore.acquire().await.unwrap();
