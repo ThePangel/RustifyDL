@@ -3,10 +3,23 @@ name = "rustifydl"
 version = "0.1.0"
 edition = "2024"
 authors = ["ThePangel"]
-description= "A pure Rust library to download Spotify songs"
+description = "A fast, no-fuss Spotify downloader built in Rust."
+license = "GPL-3.0"
+repository = "https://github.com/ThePangel/RustifyDL"
+homepage = "https://github.com/ThePangel/RustifyDL"
+documentation = "https://docs.rs/rustifydl"
+readme = "README.md"
+keywords = ["spotify", "youtube", "music", "downloader", "mp3"]
+categories = ["multimedia::audio", "command-line-utilities", "api-bindings"]
+exclude = [
+    "target/",
+    ".git/",
+    ".gitignore",
+    "*.log"
+]
 
 [[bin]]
-name = "cli"
+name = "rustifydl"
 path = "src/bin/cli.rs"
 
 [dependencies]
