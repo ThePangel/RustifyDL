@@ -38,11 +38,19 @@ use {
         youtube::{DownloadResult, search_yt},
     },
     env_logger,
+    indicatif::{MultiProgress, ProgressBar, ProgressStyle},
+    indicatif_log_bridge::LogWrapper,
     log::{error, info},
     regex::Regex,
     spotify_rs::model::track::Track,
-    std::io::Write,
-    std::{collections::HashMap, fs, sync::Arc},
+    std::{
+        collections::HashMap,
+        fs,
+        io::Write,
+        path::PathBuf,
+        sync::Arc,
+        time::{Duration, Instant},
+    },
     tokio::sync::Semaphore,
 };
 
@@ -168,32 +176,48 @@ fn is_valid_spotify_url(url: &str) -> Option<(SpotifyUrlType, String)> {
 pub async fn download_spotify(
     options: DownloadOptions,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    match options.verbosity.clone().as_str() {
-        "full" => env_logger::Builder::new()
-            .format(|buf, record| writeln!(buf, "{}", record.args()))
-            .filter_level(log::LevelFilter::Trace)
-            .init(),
-        "info" => env_logger::Builder::new()
-            .format(|buf, record| writeln!(buf, "{}", record.args()))
-            .filter_level(log::LevelFilter::Off)
-            .filter_module("rustifydl", log::LevelFilter::Info) 
-            .init(),
-        "debug" => env_logger::Builder::new()
-            .format(|buf, record| writeln!(buf, "{}", record.args()))
-            .filter_level(log::LevelFilter::Debug)
-            .filter_module("spotify_rs", log::LevelFilter::Warn)
-            .init(),
-        "none" => env_logger::Builder::new()
-            .format(|buf, record| writeln!(buf, "{}", record.args()))
-            .filter_level(log::LevelFilter::Off)
-            .init(),
-        _ => env_logger::Builder::new()
-            .format(|buf, record| writeln!(buf, "{}", record.args()))
-            .filter_level(log::LevelFilter::Info)
-            .filter_module("spotify_rs", log::LevelFilter::Warn)
-            .filter_module("rustypipe_downloader", log::LevelFilter::Warn)
-            .init(),
+    let multi = MultiProgress::new();
+    let start_time = Instant::now();
+    let mut logger = match options.verbosity.clone().as_str() {
+        "full" => {
+            let mut builder = env_logger::Builder::new();
+            builder
+                .format(|buf, record| writeln!(buf, "{}", record.args()))
+                .filter_level(log::LevelFilter::Trace);
+            builder
+        }
+        "info" => {
+            let mut builder = env_logger::Builder::new();
+            builder
+                .format(|buf, record| writeln!(buf, "{}", record.args()))
+                .filter_level(log::LevelFilter::Off)
+                .filter_module("rustifydl", log::LevelFilter::Info);
+            builder
+        }
+        "debug" => {
+            let mut builder = env_logger::Builder::new();
+            builder.filter_level(log::LevelFilter::Debug);
+            builder
+        }
+        "none" => {
+            let mut builder = env_logger::Builder::new();
+            builder
+                .format(|buf, record| writeln!(buf, "{}", record.args()))
+                .filter_level(log::LevelFilter::Off);
+            builder
+        }
+        _ => {
+            let mut builder = env_logger::Builder::new();
+            builder
+                .format(|buf, record| writeln!(buf, "{}", record.args()))
+                .filter_level(log::LevelFilter::Info)
+                .filter_module("spotify_rs", log::LevelFilter::Warn)
+                .filter_module("rustypipe_downloader", log::LevelFilter::Warn);
+            builder
+        }
     };
+    let logger = logger.build();
+    LogWrapper::new(multi.clone(), logger).try_init().unwrap();
     let (url_type, id) = is_valid_spotify_url(&options.url).ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid Spotify URL")
     })?;
@@ -209,45 +233,61 @@ pub async fn download_spotify(
             )));
         }
     };
-
-    download_and_tag_tracks(tracks, &options).await?;
+    let final_mult = multi.clone();
+    download_and_tag_tracks(tracks, &options, multi).await?;
+    let bar = final_mult.add(ProgressBar::new(100));
+    bar.set_style(ProgressStyle::with_template("{msg}")?);
+    bar.finish_with_message(format!("Took {}s", start_time.elapsed().as_secs()));
     Ok(())
 }
 
 async fn download_and_tag_tracks(
     tracks: HashMap<String, Track>,
     options: &DownloadOptions,
+    multi: MultiProgress,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut handles = Vec::new();
     let semaphore = Arc::new(Semaphore::new(options.concurrent_downloads));
     let lenght = tracks.clone().len();
     let options_cloned = Arc::new(DownloadOptions {
-            url: options.url.clone(),
-            client_id: options.client_id.to_string().clone(),
-            client_secret: options.client_secret.to_string().clone(),
-            output_dir: options.output_dir.to_string(),
-            concurrent_downloads: options.concurrent_downloads,
-            no_dupes: options.no_dupes,
-            bitrate: options.bitrate.clone(),
-            format: options.format.clone(),
-            verbosity: options.verbosity.clone(),
-            no_tag: options.no_tag,
-            timeout: options.timeout,
-        });
+        url: options.url.clone(),
+        client_id: options.client_id.to_string().clone(),
+        client_secret: options.client_secret.to_string().clone(),
+        output_dir: options.output_dir.to_string(),
+        concurrent_downloads: options.concurrent_downloads,
+        no_dupes: options.no_dupes,
+        bitrate: options.bitrate.clone(),
+        format: options.format.clone(),
+        verbosity: options.verbosity.clone(),
+        no_tag: options.no_tag,
+        timeout: options.timeout,
+    });
+
+    let multi = Arc::new(multi);
+
     for (i, (name, track)) in tracks.iter().enumerate() {
         let semaphore = semaphore.clone();
         let name = sanitize_filename(&name.as_str());
         let track = track.clone();
         let options_cloned = Arc::clone(&options_cloned);
+        let multi = Arc::clone(&multi);
         let handle = tokio::spawn(async move {
+            let bar = multi.add(ProgressBar::new_spinner());
+            bar.set_style(ProgressStyle::with_template("{spinner:.cyan} {msg}")?);
+            bar.enable_steady_tick(Duration::from_millis(100));
+
             let _permit = semaphore.acquire().await.unwrap();
-            info!("{}/{} Starting download: {}", i + 1, lenght, name);
+            bar.set_message(format!("{}/{} Downloading: {}", i + 1, lenght, name));
             if let DownloadResult::Completed = search_yt(&name, options_cloned.as_ref()).await? {
                 if !options_cloned.no_tag {
+                    bar.set_message(format!("{}/{} Tagging: {}", i + 1, lenght, name));
                     metadata(&name, &track, options_cloned.as_ref()).await?;
                 }
+            } else {
+                bar.finish_with_message(format!("File already exists, skipping!: {}", name));
+                return Ok::<(), Box<dyn std::error::Error + Send + Sync>>(());
             }
-
+            bar.finish_with_message(format!("Finished {}!", name));
             Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
         });
         handles.push(handle);
@@ -260,7 +300,11 @@ async fn download_and_tag_tracks(
             Err(e) => error!("Join error: {}", e),
         }
     }
-    fs::remove_dir_all(format!("{}/temp", options.output_dir))?;
+    if PathBuf::from(format!("{}/temp", options.output_dir)).exists() {
+        fs::remove_dir_all(format!("{}/temp", options.output_dir))?;
+    };
+
     info!("Finished!");
+
     Ok(())
 }

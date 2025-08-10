@@ -20,10 +20,7 @@ use lofty::{
     tag::{Accessor, Tag},
 };
 use reqwest;
-use spotify_rs::{
-    ClientCredsClient,
-    model::{track::Track},
-};
+use spotify_rs::{ClientCredsClient, model::track::Track};
 
 use crate::DownloadOptions;
 
@@ -59,9 +56,16 @@ pub async fn metadata(
     track: &Track,
     options: &DownloadOptions,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let spotify = ClientCredsClient::authenticate(options.client_id.clone(), options.client_secret.clone()).await?;
+    let spotify =
+        ClientCredsClient::authenticate(options.client_id.clone(), options.client_secret.clone())
+            .await?;
 
-    let path = PathBuf::from(format!("{}/{}.{}", options.output_dir, song, options.format.clone()));
+    let path = PathBuf::from(format!(
+        "{}/{}.{}",
+        options.output_dir,
+        song,
+        options.format.clone()
+    ));
     let mut tagged_file = read_from_path(&path)?;
 
     let tag_type = tagged_file.primary_tag_type();
@@ -118,12 +122,11 @@ pub async fn metadata(
     tag.set_track(track.track_number);
     tag.set_track_total(album.total_tracks);
     tag.set_year(album.release_date[..4].parse::<u32>().unwrap_or(0));
-    
+
     tagged_file.insert_tag(tag);
-        
+
     // Use ID3v2.3 only for MP3; otherwise rely on native tags.
-    let mut write_options = WriteOptions::new()
-        .remove_others(true);
+    let mut write_options = WriteOptions::new().remove_others(true);
     if options.format.eq_ignore_ascii_case("mp3") {
         write_options = write_options.use_id3v23(true);
     }

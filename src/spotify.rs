@@ -5,11 +5,11 @@
 //! Output: a `HashMap<String, Track>` keyed by a human-friendly display name,
 //! e.g. `"Artists - Title"` or with dupes, if there are two of the same file `"Artists - Album - Title"`.
 
+use crate::DownloadOptions;
+use log::info;
 use spotify_rs::model::track::Track;
 use spotify_rs::{ClientCredsClient, model::PlayableItem};
 use std::collections::HashMap;
-use crate::DownloadOptions;
-use log::info;
 
 /// Fetch a single track by Spotify ID.
 ///
@@ -18,7 +18,8 @@ pub async fn fetch_track(
     id: &str,
     options: &DownloadOptions,
 ) -> Result<HashMap<String, Track>, Box<dyn std::error::Error + Send + Sync>> {
-    let spotify = ClientCredsClient::authenticate(&options.client_id, &options.client_secret).await?;
+    let spotify =
+        ClientCredsClient::authenticate(&options.client_id, &options.client_secret).await?;
     let track = spotify_rs::track(id).get(&spotify).await?;
     let mut songs = HashMap::<String, Track>::new();
     songs.insert(
@@ -42,13 +43,14 @@ pub async fn fetch_track(
 /// The result map keys are display names. If `DownloadOptions::no_dupes` is
 /// false and a duplicate title is encountered, the album name is appended to
 /// disambiguate entries.
-/// Returns a HashMap with the track name as the key and the `` object. 
+/// Returns a HashMap with the track name as the key and the `` object.
 
 pub async fn fetch_playlist(
     id: &str,
     options: &DownloadOptions,
 ) -> Result<HashMap<String, Track>, Box<dyn std::error::Error + Send + Sync>> {
-    let spotify = ClientCredsClient::authenticate(&options.client_id, &options.client_secret).await?;
+    let spotify =
+        ClientCredsClient::authenticate(&options.client_id, &options.client_secret).await?;
     let mut songs = HashMap::<String, Track>::new();
 
     let playlist = spotify_rs::playlist(id).get(&spotify).await?;
@@ -69,7 +71,8 @@ pub async fn fetch_playlist(
                             track.name,
                         )
                         .as_str(),
-                    ) && !options.no_dupes {
+                    ) && !options.no_dupes
+                    {
                         songs.insert(
                             format!(
                                 "{} - {} - {}",
@@ -115,12 +118,13 @@ pub async fn fetch_playlist(
 /// The result map keys are display names. If `DownloadOptions::no_dupes` is
 /// false and a duplicate title is encountered, the album name is appended to
 /// disambiguate entries.
-/// Returns a HashMap with the track name as the key and the `spotify_rs::model::track::Track` object. 
+/// Returns a HashMap with the track name as the key and the `spotify_rs::model::track::Track` object.
 pub async fn fetch_album(
     id: &str,
     options: &DownloadOptions,
 ) -> Result<HashMap<String, Track>, Box<dyn std::error::Error + Send + Sync>> {
-    let spotify = ClientCredsClient::authenticate(&options.client_id, &options.client_secret).await?;
+    let spotify =
+        ClientCredsClient::authenticate(&options.client_id, &options.client_secret).await?;
     let mut songs = HashMap::<String, Track>::new();
 
     let album = spotify_rs::album(id).get(&spotify).await?;
