@@ -1,0 +1,116 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        
+      - name: Setup cache
+        uses: Swatinem/rust-cache@v2
+        
+      - name: Run tests
+        run: cargo test --verbose --locked
+        
+      - name: Check formatting
+        run: cargo fmt --check
+        
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+
+  build-release:
+    name: Build Release (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            name: rustifydl-${{ github.ref_name }}-windows-x64
+            ext: .exe
+            
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            name: rustifydl-${{ github.ref_name }}-linux-x64
+            ext: ""
+            
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          
+      - name: Setup cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+          
+      - name: Build binary
+        run: cargo build --verbose --locked --release --target ${{ matrix.target }}
+        
+      - name: Package binary
+        shell: bash
+        run: |
+          binary_name="rustifydl${{ matrix.ext }}"
+          binary_path="target/${{ matrix.target }}/release/$binary_name"
+          archive_name="${{ matrix.name }}${{ matrix.ext }}"
+          
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp "$binary_path" "$archive_name"
+          else
+            cp "$binary_path" "$archive_name"
+            chmod +x "$archive_name"
+          fi
+          
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.name }}${{ matrix.ext }}
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build-release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          files: |
+            ./artifacts/rustifydl-${{ github.ref_name }}-windows-x64/rustifydl-${{ github.ref_name }}-windows-x64.exe
+            ./artifacts/rustifydl-${{ github.ref_name }}-linux-x64/rustifydl-${{ github.ref_name }}-linux-x64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
