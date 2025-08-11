@@ -1,22 +1,17 @@
 [package]
 name = "rustifydl"
-version = "0.1.11"
+version = "0.1.12"
 edition = "2024"
-authors = ["ThePangel"]
+authors = [ "ThePangel" ]
 description = "A fast, no-fuss Spotify downloader built in Rust."
 license = "GPL-3.0"
 repository = "https://github.com/ThePangel/RustifyDL"
 homepage = "https://github.com/ThePangel/RustifyDL"
 documentation = "https://docs.rs/rustifydl"
 readme = "README.md"
-keywords = ["spotify", "youtube", "music", "downloader", "mp3"]
-categories = ["multimedia::audio", "command-line-utilities", "api-bindings"]
-exclude = [
-    "target/",
-    ".git/",
-    ".gitignore",
-    "*.log"
-]
+keywords = [ "spotify", "youtube", "music" , "downloader" , "mp3" ]
+categories = [ "multimedia::audio" , "command-line-utilities" , "api-bindings" ]
+exclude = [ "target/" , ".git/" , ".gitignore", "*.log"]
 
 [[bin]]
 name = "rustifydl"
@@ -27,10 +22,10 @@ lofty = "0.22.4"
 spotify-rs = "0.4.1"
 tokio = { version = "1.47.1", features = ["full"] }
 rustypipe = "0.11.4"
-reqwest = "0.12.22"
+reqwest = { version = "0.12.22", features = ["rustls-tls"] }
 regex = "1.11.1"
 clap = { version = "4.0", features = ["derive"] }
-rustypipe-downloader = {version = "0.3.1", features = ["audiotag", "indicatif"]}
+rustypipe-downloader = "0.3.1"
 indicatif = "0.18.0"
 dirs = "6.0.0"
 toml = "0.9.5"
@@ -38,3 +33,7 @@ serde = "1.0.219"
 log = "0.4.27"
 env_logger = "0.11.8"
 indicatif-log-bridge = "0.2.3"
+rquickjs = { version = "0.9.0", features = [ "bindgen" ] }
+
+[build-dependencies]
+bindgen = "0.70"
