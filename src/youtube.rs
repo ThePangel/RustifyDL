@@ -134,12 +134,10 @@ fn convert_to_mp3(
         .output()?;
 
     if !output.status.success() {
-        return Err(Box::new(std::io::Error::other(
-            format!(
-                "FFmpeg conversion failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ),
-        )));
+        return Err(Box::new(std::io::Error::other(format!(
+            "FFmpeg conversion failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ))));
     }
 
     info!("Completed: {name}");

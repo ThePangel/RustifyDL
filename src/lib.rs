@@ -40,7 +40,7 @@ use {
     },
     indicatif::{MultiProgress, ProgressBar, ProgressStyle},
     indicatif_log_bridge::LogWrapper,
-    log::{error, info, LevelFilter},
+    log::{LevelFilter, error, info},
     regex::Regex,
     spotify_rs::model::track::Track,
     std::{
