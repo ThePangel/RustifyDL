@@ -1,10 +1,16 @@
 # RustifyDL
 
+<div align="center">
+
 [![Crates.io](https://img.shields.io/crates/v/rustifydl.svg)](https://crates.io/crates/rustifydl)
 [![Documentation](https://docs.rs/rustifydl/badge.svg)](https://docs.rs/rustifydl)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-A fast, no-fuss Spotify downloader built in Rust.
+<img src="logo.svg" alt="RustifyDL Logo" width="200"/>
+
+**A fast, no-fuss Spotify downloader built in Rust.**
+
+</div>
 
 ## Why RustifyDL?
 Turn any Spotify track/album/playlist URL into properly tagged audio files. RustifyDL pairs Spotify metadata with audio from YouTube, then writes tidy tags and artwork so your library looks right everywhere.
