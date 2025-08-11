@@ -16,6 +16,12 @@ Turn any Spotify track/album/playlist URL into properly tagged audio files. Rust
 - 🧰 **FFmpeg-based conversion** (choose bitrate/format)
 - 📚 **Library and CLI** - use as a Rust crate or standalone binary
 
+## Demo
+
+![RustifyDL Demo](./screenshots/rustifydl_demo.gif)
+
+*RustifyDL in action: downloading a Spotify album*
+
 ## Installation
 
 ### From crates.io (Recommended)
