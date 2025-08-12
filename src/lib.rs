@@ -78,7 +78,12 @@ pub struct DownloadOptions {
     pub bitrate: String,
     /// Output format/extension (e.g., "mp3")
     pub format: String,
-    /// Log verbosity: one of "full", "debug", "info", "none"
+    /// Log verbosity level:
+    /// - `"full"`: All debug information with progress bars
+    /// - `"info"`: Standard information with progress bars  
+    /// - `"debug"`: Debug level logging with progress bars
+    /// - `"no-bars"`: Clean stdout output without progress bars (ideal for scripts/CI)
+    /// - `"none"`: Minimal output with progress bars
     pub verbosity: String,
     /// Don't write audio tags or cover art
     pub no_tag: bool,
@@ -151,6 +156,35 @@ fn is_valid_spotify_url(url: &str) -> Option<(SpotifyUrlType, String)> {
 /// 1. Determine URL type (track/album/playlist) and fetch tracks from Spotify.
 /// 2. For each track, search YouTube and download best audio stream.
 /// 3. Optionally write tags and artwork (`no_tag == false`).
+///
+/// ## Verbosity Modes
+/// 
+/// The `verbosity` field controls output behavior:
+/// - **Progress bars mode** (`"full"`, `"info"`, `"debug"`, `"none"`): Shows interactive progress bars
+/// - **No-bars mode** (`"no-bars"`): Clean stdout logging, ideal for automation and CI/CD
+///
+/// Example with no-bars mode for clean output:
+/// ```no_run
+/// use rustifydl::{download_spotify, DownloadOptions};
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+/// let opts = DownloadOptions {
+///     url: "https://open.spotify.com/playlist/xxxxxxxx".into(),
+///     client_id: "<client_id>".into(),
+///     client_secret: "<client_secret>".into(),
+///     output_dir: "./output".into(),
+///     concurrent_downloads: 8,
+///     no_dupes: true,
+///     bitrate: "192k".into(),
+///     format: "mp3".into(),
+///     verbosity: "no-bars".into(), // Clean output for scripts
+///     no_tag: false,
+///     timeout: 180,
+/// };
+/// download_spotify(opts).await?;
+/// # Ok(())
+/// # }
+/// ```
 ///
 /// Example
 /// ```no_run
@@ -244,9 +278,13 @@ pub async fn download_spotify(
     };
     let final_mult = multi.clone();
     download_and_tag_tracks(tracks, &options, multi).await?;
-    let bar = final_mult.add(ProgressBar::new(100));
-    bar.set_style(ProgressStyle::with_template("{msg}")?);
-    bar.finish_with_message(format!("Took {}s", start_time.elapsed().as_secs()));
+    if options.verbosity != "no-bars" {
+        let bar = final_mult.add(ProgressBar::new(100));
+        bar.set_style(ProgressStyle::with_template("{msg}")?);
+        bar.finish_with_message(format!("Took {}s", start_time.elapsed().as_secs()));
+    }
+
+    info!("Took {}s", start_time.elapsed().as_secs());
     Ok(())
 }
 
