@@ -56,7 +56,7 @@ pub struct Cli {
         short,
         default_value = "info",
         value_parser = clap::builder::PossibleValuesParser::new([
-            "info", "debug", "error", "none", "full"
+            "info", "debug", "error", "none", "full", "no-bars"
         ])
     )]
     pub verbosity: String,

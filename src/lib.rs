@@ -179,6 +179,8 @@ pub async fn download_spotify(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let multi = MultiProgress::new();
     let start_time = Instant::now();
+    let no_bars = options.verbosity.clone() == "no-bars";
+
     let mut logger = match options.verbosity.clone().as_str() {
         "full" => {
             let mut builder = env_logger::Builder::new();
@@ -187,7 +189,7 @@ pub async fn download_spotify(
                 .filter_level(LevelFilter::Trace);
             builder
         }
-        "info" => {
+        "info" | "no-bars" => {
             let mut builder = env_logger::Builder::new();
             builder
                 .format(|buf, record| writeln!(buf, "{}", record.args()))
@@ -217,8 +219,14 @@ pub async fn download_spotify(
             builder
         }
     };
-    let logger = logger.build();
-    LogWrapper::new(multi.clone(), logger).try_init().unwrap();
+
+    if !no_bars {
+        let logger = logger.build();
+        LogWrapper::new(multi.clone(), logger).try_init().unwrap();
+    } else {
+        logger.init();
+    }
+
     let (url_type, id) = is_valid_spotify_url(&options.url).ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid Spotify URL")
     })?;
@@ -272,28 +280,46 @@ async fn download_and_tag_tracks(
         let track = track.clone();
         let options_cloned = Arc::clone(&options_cloned);
         let multi = Arc::clone(&multi);
-        let handle = tokio::spawn(async move {
-            let bar = multi.add(ProgressBar::new_spinner());
-            bar.set_style(ProgressStyle::with_template("{spinner:.cyan} {msg}")?);
-            bar.enable_steady_tick(Duration::from_millis(100));
+        if options.verbosity.clone() != "no-bars" {
+            let handle = tokio::spawn(async move {
+                let bar = multi.add(ProgressBar::new_spinner());
+                bar.set_style(ProgressStyle::with_template("{spinner:.cyan} {msg}")?);
+                bar.enable_steady_tick(Duration::from_millis(100));
 
-            let _permit = semaphore.acquire().await.unwrap();
-            bar.set_message(format!("{}/{} Downloading: {}", i + 1, lenght, name));
-            if let DownloadResult::Completed = search_yt(&name, options_cloned.as_ref()).await? {
-                if !options_cloned.no_tag {
-                    bar.set_message(format!("{}/{} Tagging: {}", i + 1, lenght, name));
-                    metadata(&name, &track, options_cloned.as_ref()).await?;
+                let _permit = semaphore.acquire().await.unwrap();
+                bar.set_message(format!("{}/{} Downloading: {}", i + 1, lenght, name));
+                if let DownloadResult::Completed = search_yt(&name, options_cloned.as_ref()).await?
+                {
+                    if !options_cloned.no_tag {
+                        bar.set_message(format!("{}/{} Tagging: {}", i + 1, lenght, name));
+                        metadata(&name, &track, options_cloned.as_ref()).await?;
+                    }
+                } else {
+                    bar.finish_with_message(format!("File already exists, skipping!: {name}"));
+                    return Ok::<(), Box<dyn std::error::Error + Send + Sync>>(());
                 }
-            } else {
-                bar.finish_with_message(format!("File already exists, skipping!: {name}"));
-                return Ok::<(), Box<dyn std::error::Error + Send + Sync>>(());
-            }
-            bar.finish_with_message(format!("Finished {name}!"));
-            Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-        });
-        handles.push(handle);
-    }
+                bar.finish_with_message(format!("Finished {name}!"));
 
+                Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+            });
+            handles.push(handle);
+        } else {
+            let handle = tokio::spawn(async move {
+                let _permit = semaphore.acquire().await.unwrap();
+                info!("{}/{} Starting download: {}", i + 1, lenght, name);
+                if let DownloadResult::Completed = search_yt(&name, &options_cloned).await? {
+                    metadata(&name, &track, &options_cloned).await?;
+                    info!("{}/{} Tagging: {}", i + 1, lenght, name);
+                } else {
+                    info!("File already exists, skipping: {name}");
+                    return Ok::<(), Box<dyn std::error::Error + Send + Sync>>(());
+                }
+                info!("Finished {name}!");
+                Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+            });
+            handles.push(handle);
+        }
+    }
     for handle in handles {
         match handle.await {
             Ok(Ok(())) => {}
