@@ -20,17 +20,16 @@ path = "src/bin/cli.rs"
 [dependencies]
 lofty = "0.22.4"
 spotify-rs = "0.4.1"
-tokio = { version = "1.47.1", features = ["full"] }
+tokio = { version = "1.49.0", features = ["full"] }
 rustypipe = "0.11.4"
-reqwest = { version = "0.12.22", features = ["rustls-tls"] }
-regex = "1.11.1"
-clap = { version = "4.0", features = ["derive"] }
-rustypipe-downloader = "0.3.1"
-indicatif = "0.18.0"
+reqwest = { version = "0.12.28", features = ["rustls-tls"] }
+regex = "1.12.2"
+clap = { version = "4.5", features = ["derive"] }
+indicatif = "0.18.3"
 dirs = "6.0.0"
-toml = "0.9.5"
-serde = "1.0.219"
-log = "0.4.27"
+toml = "0.9.11"
+serde = "1.0.228"
+log = "0.4.29"
 env_logger = "0.11.8"
 indicatif-log-bridge = "0.2.3"
 rquickjs = { version = "0.9.0", features = [ "bindgen" ] }

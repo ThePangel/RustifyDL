@@ -7,15 +7,12 @@
 //! - Skip work if the final output already exists.
 
 use crate::DownloadOptions;
+use clap::error::Result;
 use log::info;
 use rustypipe::client::RustyPipe;
-use rustypipe::param::StreamFilter;
-use rustypipe_downloader::DownloaderBuilder;
-use std::fs;
-use std::path::PathBuf;
+use std::path::{ PathBuf};
 use std::process::Command;
-use std::time::Duration;
-use tokio::time::timeout;
+use std::{env, fs};
 
 /// Result of a download attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,10 +49,8 @@ pub async fn download(
     options: &DownloadOptions,
 ) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
     fs::create_dir_all(options.output_dir.clone())?;
-
-    let dl = DownloaderBuilder::new().build();
-    let filter_audio = StreamFilter::new().no_video();
     let mut file = PathBuf::from(format!("{}/temp/{}", options.output_dir, name));
+
     let processed_file = PathBuf::from(format!(
         "{}/{}.{}",
         options.output_dir,
@@ -67,30 +62,33 @@ pub async fn download(
         return Ok(DownloadResult::Skipped);
     }
 
-    let download_builder = dl.id(id).stream_filter(filter_audio).to_file(&file);
-    let download_status = download_builder.download();
+    let ytdl_path = download_ytdlp().await?;
 
-    match timeout(Duration::from_secs(options.timeout), download_status).await {
-        Ok(inner_result) => {
-            if let Ok(value) = inner_result {
-                file = value.dest;
-            } else if let Err(e) = inner_result {
-                return Err(format!("Download library error for {name}: {e}").into());
-            }
-        }
-        Err(_) => {
-            if std::path::Path::new(&file).exists() {
-                let _ = fs::remove_file(&file);
-            }
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::TimedOut,
-                format!(
-                    "Download for {} timed out after {} seconds",
-                    name, options.timeout
-                ),
-            )));
-        }
+    let download_video = Command::new(ytdl_path.to_str().ok_or("Invalid UTF-8 in file path")?)
+        .args([
+            "--audio-format",
+            "opus",
+            "-N",
+            &options.concurrent_downloads.clone().to_string(),
+            "--format",
+            "bestaudio",
+            "-o",
+            file.to_str().ok_or("Invalid UTF-8 in file path")?,
+            "-x",
+            id,
+        ])
+        .output()?;
+
+    if !download_video.status.success() {
+        return Err(Box::new(std::io::Error::other(format!(
+            "Downloading with yt_dlp failed: {}",
+            String::from_utf8_lossy(&download_video.stderr)
+        ))));
     }
+    file = PathBuf::from(format!(
+        "{}.opus",
+        file.to_str().ok_or("Invalid UTF-8 in file path")?
+    ));
     if file.exists() {
         convert_to_mp3(
             file.to_str().ok_or("Invalid UTF-8 in file path")?,
@@ -142,4 +140,93 @@ fn convert_to_mp3(
 
     info!("Completed: {name}");
     Ok(())
+}
+
+pub async fn download_ytdlp() -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
+    let config_dir = dirs::config_dir().ok_or("Could not find a valid config directory.")?;
+
+    let app_config_dir = config_dir.join("RustifyDL");
+    fs::create_dir_all(&app_config_dir)?;
+    let ytdlp_path;
+
+    if env::consts::OS == "windows" {
+        ytdlp_path = app_config_dir.join("yt-dlp.exe");
+        if !ytdlp_path.exists() {
+            let curl = Command::new("curl")
+                .args([
+                    "-L",
+                    "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
+                    "-o",
+                    ytdlp_path.to_str().ok_or("Invalid UTF-8 in file path")?,
+                ])
+                .output()?;
+            if !curl.status.success() {
+                return Err(Box::new(std::io::Error::other(format!(
+                    "yt-dlp download failed: {}",
+                    String::from_utf8_lossy(&curl.stderr)
+                ))));
+            }
+        }
+    } else {
+        ytdlp_path = app_config_dir.join("yt-dlp");
+        if !ytdlp_path.exists() {
+            match env::consts::OS {
+                "linux" => {
+                    let curl = Command::new("curl").args([
+                        "-L",
+                        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux",
+                        "-o",
+                        ytdlp_path.to_str().ok_or("Invalid UTF-8 in file path")?,
+                    ]).output()?;
+                    if !curl.status.success() {
+                        return Err(Box::new(std::io::Error::other(format!(
+                            "yt-dlp download failed: {}",
+                            String::from_utf8_lossy(&curl.stderr)
+                        ))));
+                    }
+                    let chmod = Command::new("chmod")
+                        .args([
+                            "a+rx",
+                            ytdlp_path.to_str().ok_or("Invalid UTF-8 in file path")?,
+                        ])
+                        .output()?;
+                    if !chmod.status.success() {
+                        return Err(Box::new(std::io::Error::other(format!(
+                            "yt-dlp download failed: {}",
+                            String::from_utf8_lossy(&chmod.stderr)
+                        ))));
+                    }
+                }
+                "macos" => {
+                    let curl = Command::new("curl").args([
+                        "-L",
+                        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
+                        "-o",
+                        ytdlp_path.to_str().ok_or("Invalid UTF-8 in file path")?,
+                    ]).output()?;
+
+                    if !curl.status.success() {
+                        return Err(Box::new(std::io::Error::other(format!(
+                            "yt-dlp download failed: {}",
+                            String::from_utf8_lossy(&curl.stderr)
+                        ))));
+                    }
+                    let chmod = Command::new("chmod")
+                        .args([
+                            "a+rx",
+                            ytdlp_path.to_str().ok_or("Invalid UTF-8 in file path")?,
+                        ])
+                        .output()?;
+                    if !chmod.status.success() {
+                        return Err(Box::new(std::io::Error::other(format!(
+                            "yt-dlp download failed: {}",
+                            String::from_utf8_lossy(&chmod.stderr)
+                        ))));
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    Ok(ytdlp_path)
 }
