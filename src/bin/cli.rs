@@ -63,7 +63,6 @@ pub struct Cli {
 
     #[arg(long = "no-tag", action = clap::ArgAction::SetTrue)]
     pub no_tag: bool,
-
 }
 
 #[tokio::main]
@@ -88,7 +87,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         format: args.format,
         verbosity: args.verbosity,
         no_tag: args.no_tag,
-      
     };
     download_spotify(options).await?;
     Ok(())
