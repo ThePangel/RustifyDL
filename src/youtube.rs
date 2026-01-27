@@ -243,13 +243,14 @@ pub fn update_ytdlp(ytdlp_path: PathBuf) -> Result<(), Box<dyn std::error::Error
             );
         }
     } else if env::consts::OS == "windows"
-        && let Some(Ok(line)) = reader.lines().nth(2) {
-            checksum = String::from(
-                line.split_whitespace()
-                    .next()
-                    .ok_or("Couldn't read checksum")?,
-            );
-        }
+        && let Some(Ok(line)) = reader.lines().nth(2)
+    {
+        checksum = String::from(
+            line.split_whitespace()
+                .next()
+                .ok_or("Couldn't read checksum")?,
+        );
+    }
 
     let mut ytdlp_file = File::open(ytdlp_path.clone())?;
 
