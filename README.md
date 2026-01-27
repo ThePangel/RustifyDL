@@ -8,33 +8,31 @@
 
 <img src="logo.svg" alt="RustifyDL Logo" width="200"/>
 
-**A fast, no-fuss Spotify downloader built in Rust.**
+A Spotify downloader written in Rust.
 
 </div>
 
-## Why RustifyDL?
+---
+
 Turn any Spotify track/album/playlist URL into properly tagged audio files. RustifyDL pairs Spotify metadata with audio from YouTube, then writes tidy tags and artwork so your library looks right everywhere.
 
 ## Features
-- ⚡ **Concurrent downloads** for maximum speed
-- 🏷️ **Accurate tags**: artist, album, track/disc numbers, genre, year, cover art
-- 🔇 **Clean, minimal logging** (tune with verbosity levels)
-- 🧰 **FFmpeg-based conversion** (choose bitrate/format)
-- 📚 **Library and CLI** - use as a Rust crate or standalone binary
+- Downloads tracks in parallel
+- Writes clean metadata (artist, album, track numbers, cover art)
+- Uses FFmpeg for conversion and bitrate control
+- Quiet by default, more logs if you want them
+- Works as both a CLI tool and a Rust library
 
 ## Demo
 
 ![RustifyDL Demo](./screenshots/rustifydl_demo.gif)
 
-*RustifyDL in action: downloading a Spotify album*
-
 ## Installation
 
-### From crates.io (Recommended)
+### From crates.io
 ```bash
 cargo install rustifydl
 ```
-
 ### From source
 Prerequisites:
 - FFmpeg on PATH
@@ -49,7 +47,7 @@ cargo install --path . --force
 
 ### Command Line Interface
 ```bash
-rustifydl "https://open.spotify.com/album/..." -v info --format mp3 --bitrate 192k --concurrent-downloads 8
+rustifydl "https://open.spotify.com/album/..."
 ```
 
 **Common options** (see `rustifydl --help` for full list):
@@ -61,11 +59,9 @@ rustifydl "https://open.spotify.com/album/..." -v info --format mp3 --bitrate 19
 - `--no-dupes`  Skip duplicate track names when collecting
 
 ### Library Usage
-Add to your `Cargo.toml`:
-```toml
-[dependencies]
-rustifydl = "0.1"
-tokio = { version = "1", features = ["full"] }
+Add to project:
+```bash
+cargo add rustifydl
 ```
 
 Example usage:
@@ -85,7 +81,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         format: "mp3".into(),
         verbosity: "info".into(),
         no_tag: false,
-        timeout: 60,
     };
     
     download_spotify(opts).await?;
@@ -110,14 +105,14 @@ src/
 ├── lib.rs         # Library API & orchestration
 ├── metadata.rs    # Tag writing (lofty)
 ├── spotify.rs     # Spotify fetch (spotify-rs)
-└── youtube.rs     # YouTube download (rustypipe + ffmpeg)
+└── youtube.rs     # YouTube download (rustypipe + yt_dlp + ffmpeg)
 ```
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Status
-🚧 Active development
+Active development (When and if I feel like it, works for now)
 
 ## License
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.

@@ -2048,12 +2048,13 @@ checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
 
 [[package]]
 name = "rustifydl"
-version = "0.1.21"
+version = "0.2.21"
 dependencies = [
  "bindgen 0.70.1",
  "clap",
  "dirs",
  "env_logger",
+ "hex",
  "indicatif",
  "indicatif-log-bridge",
  "lofty",
@@ -2063,6 +2064,7 @@ dependencies = [
  "rquickjs",
  "rustypipe",
  "serde",
+ "sha2",
  "spotify-rs",
  "tokio",
  "toml",

@@ -1,6 +1,6 @@
 [package]
 name = "rustifydl"
-version = "0.1.21"
+version = "0.2.21"
 edition = "2024"
 authors = [ "ThePangel" ]
 description = "A fast, no-fuss Spotify downloader built in Rust."
@@ -33,6 +33,8 @@ log = "0.4.29"
 env_logger = "0.11.8"
 indicatif-log-bridge = "0.2.3"
 rquickjs = { version = "0.9.0", features = [ "bindgen" ] }
+sha2 = "0.10.9"
+hex = "0.4.3"
 
 [build-dependencies]
 bindgen = "0.70"
