@@ -25,7 +25,6 @@
 //!         format: "mp3".into(),
 //!         verbosity: "info".into(),
 //!         no_tag: false,
-//!         timeout: 180,
 //!     };
 //!     download_spotify(opts).await
 //! }
@@ -45,7 +44,7 @@ use {
     spotify_rs::model::track::Track,
     std::{
         collections::HashMap,
-        fs,
+        fs::{self, remove_dir_all},
         io::Write,
         path::PathBuf,
         sync::Arc,
@@ -87,8 +86,6 @@ pub struct DownloadOptions {
     pub verbosity: String,
     /// Don't write audio tags or cover art
     pub no_tag: bool,
-    /// Per-download timeout in seconds for YouTube download
-    pub timeout: u64,
 }
 
 fn sanitize_filename(name: &str) -> String {
@@ -158,7 +155,7 @@ fn is_valid_spotify_url(url: &str) -> Option<(SpotifyUrlType, String)> {
 /// 3. Optionally write tags and artwork (`no_tag == false`).
 ///
 /// ## Verbosity Modes
-/// 
+///
 /// The `verbosity` field controls output behavior:
 /// - **Progress bars mode** (`"full"`, `"info"`, `"debug"`, `"none"`): Shows interactive progress bars
 /// - **No-bars mode** (`"no-bars"`): Clean stdout logging, ideal for automation and CI/CD
@@ -179,7 +176,6 @@ fn is_valid_spotify_url(url: &str) -> Option<(SpotifyUrlType, String)> {
 ///     format: "mp3".into(),
 ///     verbosity: "no-bars".into(), // Clean output for scripts
 ///     no_tag: false,
-///     timeout: 180,
 /// };
 /// download_spotify(opts).await?;
 /// # Ok(())
@@ -202,7 +198,6 @@ fn is_valid_spotify_url(url: &str) -> Option<(SpotifyUrlType, String)> {
 ///     format: "mp3".into(),
 ///     verbosity: "info".into(),
 ///     no_tag: false,
-///     timeout: 180,
 /// };
 /// download_spotify(opts).await?;
 /// # Ok(())
@@ -285,6 +280,10 @@ pub async fn download_spotify(
     }
 
     info!("Took {}s", start_time.elapsed().as_secs());
+    let temp_path = PathBuf::from(format!("{}/temp", options.output_dir));
+    if temp_path.exists() {
+        remove_dir_all(temp_path)?;
+    }
     Ok(())
 }
 
@@ -307,7 +306,6 @@ async fn download_and_tag_tracks(
         format: options.format.clone(),
         verbosity: options.verbosity.clone(),
         no_tag: options.no_tag,
-        timeout: options.timeout,
     });
 
     let multi = Arc::new(multi);
