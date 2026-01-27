@@ -33,12 +33,18 @@ pub enum DownloadResult {
 pub async fn search_yt(
     name: &str,
     options: &DownloadOptions,
+    ytdlp_path: PathBuf,
 ) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
     let rp = RustyPipe::new();
     let search_results = rp.query().music_search_tracks(name).await?;
 
-    if let DownloadResult::Skipped =
-        download(search_results.items.items[0].id.as_str(), name, options).await?
+    if let DownloadResult::Skipped = download(
+        search_results.items.items[0].id.as_str(),
+        name,
+        options,
+        ytdlp_path,
+    )
+    .await?
     {
         return Ok(DownloadResult::Skipped);
     }
@@ -52,6 +58,7 @@ pub async fn download(
     id: &str,
     name: &str,
     options: &DownloadOptions,
+    ytdlp_path: PathBuf,
 ) -> Result<DownloadResult, Box<dyn std::error::Error + Send + Sync>> {
     fs::create_dir_all(options.output_dir.clone())?;
     let mut file = PathBuf::from(format!("{}/temp/{}", options.output_dir, name));
@@ -67,9 +74,7 @@ pub async fn download(
         return Ok(DownloadResult::Skipped);
     }
 
-    let ytdl_path = download_ytdlp()?;
-
-    let download_video = Command::new(ytdl_path.to_str().ok_or("Invalid UTF-8 in file path")?)
+    let download_video = Command::new(ytdlp_path.to_str().ok_or("Invalid UTF-8 in file path")?)
         .args([
             "--audio-format",
             "opus",
