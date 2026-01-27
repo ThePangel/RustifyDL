@@ -1,6 +1,6 @@
 [package]
 name = "rustifydl"
-version = "0.2.3"
+version = "0.2.30"
 edition = "2024"
 authors = [ "ThePangel" ]
 description = "A fast, no-fuss Spotify downloader built in Rust."
