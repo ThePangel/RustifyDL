@@ -35,7 +35,7 @@ use {
     crate::{
         metadata::metadata,
         spotify::{fetch_album, fetch_playlist, fetch_track},
-        youtube::{DownloadResult, search_yt},
+        youtube::{DownloadResult, download_ytdlp, search_yt},
     },
     indicatif::{MultiProgress, ProgressBar, ProgressStyle},
     indicatif_log_bridge::LogWrapper,
@@ -308,6 +308,7 @@ async fn download_and_tag_tracks(
         no_tag: options.no_tag,
     });
 
+    let ytdlp_path = download_ytdlp()?;
     let multi = Arc::new(multi);
 
     for (i, (name, track)) in tracks.iter().enumerate() {
@@ -316,7 +317,9 @@ async fn download_and_tag_tracks(
         let track = track.clone();
         let options_cloned = Arc::clone(&options_cloned);
         let multi = Arc::clone(&multi);
+
         if options.verbosity.clone() != "no-bars" {
+            let task_ytdlp_path = ytdlp_path.clone();
             let handle = tokio::spawn(async move {
                 let bar = multi.add(ProgressBar::new_spinner());
                 bar.set_style(ProgressStyle::with_template("{spinner:.cyan} {msg}")?);
@@ -324,7 +327,8 @@ async fn download_and_tag_tracks(
 
                 let _permit = semaphore.acquire().await.unwrap();
                 bar.set_message(format!("{}/{} Downloading: {}", i + 1, lenght, name));
-                if let DownloadResult::Completed = search_yt(&name, options_cloned.as_ref()).await?
+                if let DownloadResult::Completed =
+                    search_yt(&name, options_cloned.as_ref(), task_ytdlp_path).await?
                 {
                     if !options_cloned.no_tag {
                         bar.set_message(format!("{}/{} Tagging: {}", i + 1, lenght, name));
@@ -340,10 +344,13 @@ async fn download_and_tag_tracks(
             });
             handles.push(handle);
         } else {
+            let task_ytdlp_path = ytdlp_path.clone();
             let handle = tokio::spawn(async move {
                 let _permit = semaphore.acquire().await.unwrap();
                 info!("{}/{} Starting download: {}", i + 1, lenght, name);
-                if let DownloadResult::Completed = search_yt(&name, &options_cloned).await? {
+                if let DownloadResult::Completed =
+                    search_yt(&name, &options_cloned, task_ytdlp_path).await?
+                {
                     metadata(&name, &track, &options_cloned).await?;
                     info!("{}/{} Tagging: {}", i + 1, lenght, name);
                 } else {
