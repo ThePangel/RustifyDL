@@ -27,8 +27,9 @@
 //!         verbosity: "info".into(),
 //!         no_tag: false,
 //!     };
-//! let ytdlp_dir == String::from(./ytdlp);
+//! let ytdlp_dir = String::from("./ytdlp");
 //! download_spotify(opts, ytdlp_dir).await?;
+//! Ok(())
 //! }
 //! ```
 
@@ -179,7 +180,7 @@ fn is_valid_spotify_url(url: &str) -> Option<(SpotifyUrlType, String)> {
 ///     verbosity: "no-bars".into(), // Clean output for scripts
 ///     no_tag: false,
 /// };
-/// let ytdlp_dir == String::from(./ytdlp);
+/// let ytdlp_dir = String::from("./ytdlp");
 /// download_spotify(opts, ytdlp_dir).await?;
 /// # Ok(())
 /// # }
@@ -203,10 +204,10 @@ fn is_valid_spotify_url(url: &str) -> Option<(SpotifyUrlType, String)> {
 ///     no_tag: false,
 /// };
 ///
-/// let ytdlp_dir == String::from(./ytdlp);
+/// let ytdlp_dir = String::from("./ytdlp");
 /// download_spotify(opts, ytdlp_dir).await?;
-/// # Ok(())
-/// # }
+///  Ok(())
+///  }
 /// ```
 pub async fn download_spotify(
     options: DownloadOptions,
