@@ -19,6 +19,7 @@ use std::io::{BufRead, BufReader, copy};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::{env, fs};
+use toml::Value;
 
 /// Result of a download attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,7 +75,12 @@ pub async fn download(
         return Ok(DownloadResult::Skipped);
     }
 
-    let download_video = Command::new(ytdlp_path.to_str().ok_or("Invalid UTF-8 in file path")?)
+    let fixed_path = if ytdlp_path.is_relative() && !ytdlp_path.starts_with(".") {
+        PathBuf::from(".").join(ytdlp_path)
+    } else {
+        ytdlp_path
+    };
+    let download_video = Command::new(fixed_path.to_str().ok_or("Invalid UTF-8 in file path")?)
         .args([
             "--audio-format",
             "opus",
@@ -145,15 +151,52 @@ fn transcode(
 
 /// Downloads the latest ytdlpd binary for the users OS
 /// and gives the current user executing permissions (Linux & MacOS)
-pub fn download_ytdlp() -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
+/// Also handles custom download directories through the config file if needed
+pub fn download_ytdlp(
+    ytdlp_dir: String,
+) -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
+    let mut ytdlp_path;
+
     let config_dir = dirs::config_dir().ok_or("Could not find a valid config directory.")?;
-
     let app_config_dir = config_dir.join("RustifyDL");
-    fs::create_dir_all(&app_config_dir)?;
-    let ytdlp_path;
 
+    let config_path = app_config_dir.join("config.toml");
+
+    if config_path.exists() && config_path.is_file() && fs::metadata(&config_path)?.len() != 0 {
+        let content = fs::read_to_string(&config_path)?;
+        let mut config_file = toml::from_str::<Value>(&content)?;
+        ytdlp_path = match config_file["ytdlp_dir"].clone().as_str() {
+            Some(a) => {
+                if !ytdlp_dir.is_empty() {
+                    if ytdlp_dir == "default" {
+                        config_file["ytdlp_dir"] = Value::String("".to_string());
+                        fs::write(
+                            config_path,
+                            toml::to_string(&config_file).expect("Failed to serialize TOML"),
+                        )?;
+                        app_config_dir
+                    } else {
+                        config_file["ytdlp_dir"] = Value::String(ytdlp_dir.clone());
+                        fs::write(
+                            config_path,
+                            toml::to_string(&config_file).expect("Failed to serialize TOML"),
+                        )?;
+                        PathBuf::from(a)
+                    }
+                } else if !a.is_empty() {
+                    PathBuf::from(a)
+                } else {
+                    app_config_dir
+                }
+            }
+            None => app_config_dir,
+        };
+        fs::create_dir_all(ytdlp_dir)?;
+    } else {
+        ytdlp_path = app_config_dir;
+    }
     if env::consts::OS == "windows" {
-        ytdlp_path = app_config_dir.join("yt-dlp.exe");
+        ytdlp_path = ytdlp_path.join("yt-dlp.exe");
         if !ytdlp_path.exists() {
             println!("Downloading yt-dlp binary (First time only or update/repair)");
             let curl = Command::new("curl")
@@ -169,7 +212,8 @@ pub fn download_ytdlp() -> Result<PathBuf, Box<dyn std::error::Error + Send + Sy
             update_ytdlp(ytdlp_path.clone())?;
         }
     } else {
-        ytdlp_path = app_config_dir.join("yt-dlp");
+        ytdlp_path = ytdlp_path.join("yt-dlp");
+
         if !ytdlp_path.exists() {
             println!("Downloading yt-dlp binary (First time only or update/repair)");
             match env::consts::OS {
@@ -218,7 +262,9 @@ pub fn download_ytdlp() -> Result<PathBuf, Box<dyn std::error::Error + Send + Sy
 
 /// Compares latest ytdlp checksum to the installed binary's checksum
 /// to update or repair the binary
-pub fn update_ytdlp(ytdlp_path: PathBuf) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub fn update_ytdlp(
+    mut ytdlp_path: PathBuf,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let curl = Command::new("curl")
         .args([
             "-L",
@@ -256,7 +302,6 @@ pub fn update_ytdlp(ytdlp_path: PathBuf) -> Result<(), Box<dyn std::error::Error
                 .ok_or("Couldn't read checksum")?,
         );
     }
-
     let mut ytdlp_file = File::open(ytdlp_path.clone())?;
 
     let mut sha256 = Sha256::new();
@@ -267,7 +312,8 @@ pub fn update_ytdlp(ytdlp_path: PathBuf) -> Result<(), Box<dyn std::error::Error
     remove_file("./checksums")?;
     if hash != GenericArray::clone_from_slice(&checksum_decoded) {
         remove_file(&ytdlp_path)?;
-        download_ytdlp()?;
+        ytdlp_path.pop();
+        download_ytdlp(ytdlp_path.into_os_string().into_string().unwrap())?;
     }
     Ok(())
 }

@@ -6,6 +6,7 @@
 //!
 //! Key items:
 //! - [`DownloadOptions`] input options
+//! - `ytdlp_dir` ytdlp binary download directory
 //! - [`download_spotify`] to drive the whole flow asynchronously
 //!
 //! Examples
@@ -26,7 +27,8 @@
 //!         verbosity: "info".into(),
 //!         no_tag: false,
 //!     };
-//!     download_spotify(opts).await
+//! let ytdlp_dir == String::from(./ytdlp);
+//! download_spotify(opts, ytdlp_dir).await?;
 //! }
 //! ```
 
@@ -177,7 +179,8 @@ fn is_valid_spotify_url(url: &str) -> Option<(SpotifyUrlType, String)> {
 ///     verbosity: "no-bars".into(), // Clean output for scripts
 ///     no_tag: false,
 /// };
-/// download_spotify(opts).await?;
+/// let ytdlp_dir == String::from(./ytdlp);
+/// download_spotify(opts, ytdlp_dir).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -199,17 +202,19 @@ fn is_valid_spotify_url(url: &str) -> Option<(SpotifyUrlType, String)> {
 ///     verbosity: "info".into(),
 ///     no_tag: false,
 /// };
-/// download_spotify(opts).await?;
+///
+/// let ytdlp_dir == String::from(./ytdlp);
+/// download_spotify(opts, ytdlp_dir).await?;
 /// # Ok(())
 /// # }
 /// ```
 pub async fn download_spotify(
     options: DownloadOptions,
+    ytdlp_dir: String,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let multi = MultiProgress::new();
     let start_time = Instant::now();
     let no_bars = options.verbosity.clone() == "no-bars";
-
     let mut logger = match options.verbosity.clone().as_str() {
         "full" => {
             let mut builder = env_logger::Builder::new();
@@ -272,7 +277,7 @@ pub async fn download_spotify(
         }
     };
     let final_mult = multi.clone();
-    download_and_tag_tracks(tracks, &options, multi).await?;
+    download_and_tag_tracks(tracks, &options, multi, ytdlp_dir).await?;
     if options.verbosity != "no-bars" {
         let bar = final_mult.add(ProgressBar::new(100));
         bar.set_style(ProgressStyle::with_template("{msg}")?);
@@ -291,6 +296,7 @@ async fn download_and_tag_tracks(
     tracks: HashMap<String, Track>,
     options: &DownloadOptions,
     multi: MultiProgress,
+    ytdlp_dir: String,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut handles = Vec::new();
     let semaphore = Arc::new(Semaphore::new(options.concurrent_downloads));
@@ -308,7 +314,7 @@ async fn download_and_tag_tracks(
         no_tag: options.no_tag,
     });
 
-    let ytdlp_path = download_ytdlp()?;
+    let ytdlp_path = download_ytdlp(ytdlp_dir)?;
     let multi = Arc::new(multi);
 
     for (i, (name, track)) in tracks.iter().enumerate() {

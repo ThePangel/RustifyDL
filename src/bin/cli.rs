@@ -63,6 +63,9 @@ pub struct Cli {
 
     #[arg(long = "no-tag", action = clap::ArgAction::SetTrue)]
     pub no_tag: bool,
+
+    #[arg(long = "ytdlp-dir", short, default_value = "")]
+    pub ytdlp_dir: String,
 }
 
 #[tokio::main]
@@ -88,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         verbosity: args.verbosity,
         no_tag: args.no_tag,
     };
-    download_spotify(options).await?;
+    download_spotify(options, args.ytdlp_dir).await?;
     Ok(())
 }
 
@@ -112,7 +115,6 @@ async fn check_api_keys() -> Result<Config, Box<dyn std::error::Error + Send + S
                 loop {
                     print!("Enter Client ID: ");
                     std::io::stdout().flush()?;
-                    client_id.clear();
                     std::io::stdin().read_line(&mut client_id)?;
                     if verify_key(client_id.trim()) {
                         break;
@@ -143,7 +145,6 @@ async fn check_api_keys() -> Result<Config, Box<dyn std::error::Error + Send + S
                 return Ok(keys);
             }
         };
-
         if keys.client_id.trim().is_empty() {
             eprint!("Client id is empty or missing!");
             loop {
